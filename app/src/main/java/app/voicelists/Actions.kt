@@ -5,24 +5,58 @@ import android.app.AlertDialog
 import android.text.Editable
 import android.text.TextWatcher
 import android.widget.EditText
+import android.widget.Toast
 
-/** Asks which category to use: the existing ones, plus a new one typed by hand. */
-fun Activity.pickCategory(title: String, categories: MutableList<Category>, exclude: Category? = null, onPick: (Category) -> Unit) {
+/** Asks which category to use: the shared ones, plus a new one typed by hand. */
+fun Activity.pickCategory(title: String, data: Data, exclude: Category? = null, onPick: (Category) -> Unit) {
     val s = Lang.strings(this)
-    val options = categories.filter { it !== exclude }
-    val labels = options.map { it.name } + ("+ " + s.newCategory)
+    val options = data.categories.filter { it !== exclude }
+    val labels = options.map { it.name } + s.newCategoryButton
     AlertDialog.Builder(this)
         .setTitle(title)
         .setItems(labels.toTypedArray()) { _, which ->
             if (which < options.size) onPick(options[which])
-            else prompt(s.newCategory, "") { name ->
-                val c = Matcher.findCategory(categories, name)?.takeIf { Matcher.sameText(it.name, name) }
-                    ?: Category(Store.newId(), name).also { categories.add(it) }
-                onPick(c)
-            }
+            else prompt(s.newCategory, "") { onPick(data.categoryNamed(it)) }
         }
         .setNegativeButton(s.cancel, null)
         .show()
+}
+
+/** Asks which open list to use, only when there's more than one. With none open, a new list is started. */
+fun Activity.pickList(data: Data, exclude: ItemList? = null, onPick: (ItemList) -> Unit) {
+    val s = Lang.strings(this)
+    val options = if (exclude == null) data.openListsOrNew(s) else data.openLists.filter { it !== exclude }
+    if (exclude == null && options.size == 1) return onPick(options[0])
+    if (options.isEmpty()) return
+    AlertDialog.Builder(this)
+        .setTitle(s.askList)
+        .setItems(options.map { it.name }.toTypedArray()) { _, which -> onPick(options[which]) }
+        .setNegativeButton(s.cancel, null)
+        .show()
+}
+
+/** Adds a typed or dictated item: asks the category, then the list (unless [list] is given). */
+fun Activity.addItemFlow(data: Data, raw: String, list: ItemList?, done: () -> Unit) {
+    val s = Lang.strings(this)
+    val text = raw.trim().replaceFirstChar { it.uppercase(s.locale) }
+    if (text.isEmpty()) return
+    if (list != null) Store.findOpenItem(list, text)?.let {
+        Toast.makeText(this, s.alreadyExists(text, list.name), Toast.LENGTH_SHORT).show()
+        return
+    }
+    pickCategory("${s.askCategory} ($text)", data) { cat ->
+        fun addTo(l: ItemList) {
+            if (Store.findOpenItem(l, text) != null) {
+                Toast.makeText(this, s.alreadyExists(text, l.name), Toast.LENGTH_SHORT).show()
+            } else {
+                Store.addItem(l, cat, text)
+                Toast.makeText(this, s.added(text, cat.name, l.name), Toast.LENGTH_SHORT).show()
+            }
+            Store.save(this, data)
+            done()
+        }
+        if (list != null) addTo(list) else pickList(data) { addTo(it) }
+    }
 }
 
 /**

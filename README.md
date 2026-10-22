@@ -18,14 +18,14 @@ Every step also has buttons, and existing categories show as tap-able chips.
 The window acts on "add" / "הוסף" as soon as it's heard, and also accepts it first ("add milk").
 
 ## In the app
-- The main screen shows every category with its items underneath. Tap a heading to open that category,
-  long-press it to rename or delete it, and use **+ New list** to create a category by hand.
-- Type or dictate in the box at the top. Dictating with the keyboard mic and ending with "add" / "הוסף"
-  adds the item straight away and asks for the category.
-- Tap **⇄** next to an item to move it to another category (or long-press the item for move, rename, delete).
-
-A widget can't switch on the keyboard's dictation, so the window uses Android's speech recognizer
-(the same Google engine as Gboard's mic) and reads questions aloud with text-to-speech.
+- **Lists → categories → items.** The main screen shows your lists (open ones first, closed ones below).
+  Categories are one shared set used by every list (the **Categories** button adds, renames and deletes them).
+- A list can be closed and reopened (long-press it, or from its menu). Only open lists take new items.
+- Adding an item asks for the category, then for the list, but only when more than one list is open.
+  With no open list, a new one is started.
+- Inside a list, items are grouped by category. Tap **⇄** to change an item's category; long-press for
+  move to another list, rename, delete.
+- Dictating with the keyboard mic and ending with "add" / "הוסף" adds the item straight away.
 
 ## Language
 Menu → Language: **Automatic** follows the keyboard's current language (then the phone's language),
@@ -33,7 +33,7 @@ or pick Hebrew or English. For spoken questions in Hebrew, make sure the Hebrew 
 Settings → System → Languages → Text-to-speech output → Speech Services by Google → Install voice data.
 
 ## Building
-- GitHub: every push to `main` builds `VoiceLists.apk` and attaches it to the **latest** release.
+- GitHub: every push to `main` builds `VoiceLists-<version>.apk` and publishes it as release `v<version>`.
 - Android Studio: open the folder and run on the phone.
 - Command line: `./gradlew assembleRelease` (needs the Android SDK with platform 34).
 

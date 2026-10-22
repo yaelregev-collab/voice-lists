@@ -87,13 +87,17 @@ object Matcher {
 
     fun sameText(a: String, b: String): Boolean = forms(a).intersect(forms(b)).isNotEmpty()
 
-    /** Best matching category for a spoken name, allowing small recognition mistakes. */
-    fun findCategory(categories: List<Category>, spoken: String): Category? {
-        categories.firstOrNull { sameText(it.name, spoken) }?.let { return it }
-        var best: Category? = null
+    fun findCategory(categories: List<Category>, spoken: String): Category? = findNamed(categories, spoken) { it.name }
+
+    fun findList(lists: List<ItemList>, spoken: String): ItemList? = findNamed(lists, spoken) { it.name }
+
+    /** Best match for a spoken name, allowing small recognition mistakes. */
+    private fun <T> findNamed(options: List<T>, spoken: String, name: (T) -> String): T? {
+        options.firstOrNull { sameText(name(it), spoken) }?.let { return it }
+        var best: T? = null
         var bestDist = Int.MAX_VALUE
-        for (c in categories) {
-            for (a in forms(c.name)) for (b in forms(spoken)) {
+        for (c in options) {
+            for (a in forms(name(c))) for (b in forms(spoken)) {
                 val d = distance(a, b)
                 val allowed = when {
                     maxOf(a.length, b.length) <= 3 -> 0

@@ -21,25 +21,26 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * The small floating window the widget opens. It listens for an item, adds as soon as it hears "add",
- * asks for the category, and saves. Questions are read aloud with text-to-speech.
+ * The small floating window the widget opens. It listens for an item, moves on as soon as it hears "add",
+ * asks for the category, then the list when more than one is open, and saves. Questions are read aloud with text-to-speech.
  */
 class VoiceActivity : Activity() {
 
     companion object {
-        /** Optional: add straight into this category without asking. */
-        const val EXTRA_CATEGORY = "category_id"
+        /** Optional: add into this list without asking which one. */
+        const val EXTRA_LIST = "list_id"
         private const val REQ_MIC = 1
     }
 
-    private enum class Step { ITEM, CATEGORY, CONFIRM, NEW_CATEGORY, DONE }
+    private enum class Step { ITEM, CATEGORY, CONFIRM, NEW_CATEGORY, LIST, DONE }
 
     private lateinit var s: Str
-    private lateinit var categories: MutableList<Category>
+    private lateinit var data: Data
     private var step = Step.ITEM
     private var item: String? = null
+    private var category: Category? = null
     private var pendingCategory: String? = null
-    private var presetCategory: Category? = null
+    private var presetList: ItemList? = null
 
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
@@ -65,9 +66,8 @@ class VoiceActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         s = Lang.strings(this)
-        categories = Store.load(this)
-        val presetId = intent.getLongExtra(EXTRA_CATEGORY, -1L)
-        presetCategory = categories.firstOrNull { it.id == presetId }
+        data = Store.load(this)
+        presetList = data.list(intent.getLongExtra(EXTRA_LIST, -1L))?.takeIf { !it.closed }
         buildUi()
 
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
@@ -165,9 +165,9 @@ class VoiceActivity : Activity() {
                 }
                 // "pharmacy add": an existing category is used, a new one is created right away.
                 val stripped = results.firstNotNullOfOrNull { Matcher.stripAdd(it) }
-                val match = results.firstNotNullOfOrNull { Matcher.findCategory(categories, Matcher.stripAdd(it) ?: it) }
+                val match = results.firstNotNullOfOrNull { Matcher.findCategory(data.categories, Matcher.stripAdd(it) ?: it) }
                 when {
-                    match != null -> addTo(match)
+                    match != null -> categoryChosen(match)
                     stripped != null -> createAndAdd(stripped)
                     else -> askCreate(first)
                 }
@@ -181,6 +181,14 @@ class VoiceActivity : Activity() {
                     ?: Matcher.stripAdd(first) ?: first
                 createAndAdd(name)
             }
+            Step.LIST -> {
+                if (results.all { Matcher.isAdd(it) }) {
+                    listen()
+                    return
+                }
+                val match = results.firstNotNullOfOrNull { Matcher.findList(data.openLists, Matcher.stripAdd(it) ?: it) }
+                if (match != null) addTo(match) else askList()
+            }
             Step.DONE -> {}
         }
     }
@@ -189,15 +197,7 @@ class VoiceActivity : Activity() {
         val text = item?.trim()?.replaceFirstChar { it.uppercase(s.locale) } ?: return
         item = text
         heardView.text = text
-        val existing = Store.findOpenItem(categories, text)
-        if (existing != null) {
-            step = Step.DONE
-            showActions()
-            say(s.alreadyExists(text, existing.first.name)) { finish() }
-            return
-        }
-        val preset = presetCategory
-        if (preset != null) addTo(preset) else askCategory()
+        askCategory()
     }
 
     private fun askCategory() {
@@ -232,20 +232,39 @@ class VoiceActivity : Activity() {
         val name = spoken?.trim()?.ifEmpty { null }?.replaceFirstChar { it.uppercase(s.locale) }
             ?: return askCategory()
         // Saying the name of a category that already exists just uses it.
-        categories.firstOrNull { Matcher.sameText(it.name, name) }?.let { return addTo(it) }
-        val cat = Category(Store.newId(), name)
-        categories.add(cat)
-        addTo(cat, created = true)
+        categoryChosen(data.categoryNamed(name))
     }
 
-    private fun addTo(category: Category, created: Boolean = false) {
-        val text = item ?: return
-        Store.addItem(category, text)
-        Store.save(this, categories)
-        step = Step.DONE
-        titleView.text = "✓ ${category.name}"
+    /** Then the list: asked only when more than one list is open. */
+    private fun categoryChosen(c: Category) {
+        category = c
+        val lists = presetList?.let { listOf(it) } ?: data.openListsOrNew(s)
+        if (lists.size == 1) addTo(lists[0]) else askList()
+    }
+
+    private fun askList() {
+        step = Step.LIST
+        titleView.text = s.askList
         showActions()
-        say(if (created) s.created(category.name, text) else s.added(text, category.name)) { finish() }
+        say(s.askList) {
+            status(s.listHint)
+            listen()
+        }
+    }
+
+    private fun addTo(list: ItemList) {
+        val text = item ?: return
+        val cat = category ?: return askCategory()
+        step = Step.DONE
+        showActions()
+        if (Store.findOpenItem(list, text) != null) {
+            say(s.alreadyExists(text, list.name)) { finish() }
+            return
+        }
+        Store.addItem(list, cat, text)
+        Store.save(this, data)
+        titleView.text = "✓ ${cat.name} · ${list.name}"
+        say(s.added(text, cat.name, list.name)) { finish() }
     }
 
     // ---- Speech in and out ----
@@ -312,7 +331,7 @@ class VoiceActivity : Activity() {
             heardView.text = p
             // Act on "add" / "הוסף" the moment it's heard, without waiting for the pause at the end.
             if (!listening) return
-            if (step == Step.CATEGORY || step == Step.CONFIRM || step == Step.NEW_CATEGORY) {
+            if (step == Step.CATEGORY || step == Step.CONFIRM || step == Step.NEW_CATEGORY || step == Step.LIST) {
                 if (Matcher.stripTrailingAdd(p) != null || (step == Step.CONFIRM && Matcher.isAdd(p))) {
                     stopListening()
                     onHeard(listOf(p))
@@ -431,10 +450,16 @@ class VoiceActivity : Activity() {
             chipsScroll.visibility = View.VISIBLE
             chips.addView(pill(s.newCategoryButton) { askNewCategory() }, gap)
         }
-        if (step == Step.CATEGORY && categories.isNotEmpty()) {
+        if (step == Step.CATEGORY && data.categories.isNotEmpty()) {
             chipsScroll.visibility = View.VISIBLE
-            for (c in categories) {
-                chips.addView(pill(c.name, filled = false) { addTo(c) }, gap)
+            for (c in data.categories) {
+                chips.addView(pill(c.name, filled = false) { categoryChosen(c) }, gap)
+            }
+        }
+        if (step == Step.LIST) {
+            chipsScroll.visibility = View.VISIBLE
+            for (l in data.openLists) {
+                chips.addView(pill(l.name, filled = false) { addTo(l) }, gap)
             }
         }
         if (step != Step.DONE) actions.addView(pill(s.cancel, filled = false) { finish() }, gap)

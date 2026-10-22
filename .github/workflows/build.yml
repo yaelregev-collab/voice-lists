@@ -21,15 +21,18 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease
-          cp app/build/outputs/apk/release/app-release.apk VoiceLists.apk
+          # Name the file after the version, so every download saves under a new name.
+          VERSION=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          cp app/build/outputs/apk/release/app-release.apk "VoiceLists-$VERSION.apk"
       - uses: actions/upload-artifact@v4
         with:
-          name: VoiceLists-apk
-          path: VoiceLists.apk
-      - name: Publish as the "latest" release
+          name: VoiceLists-${{ env.VERSION }}
+          path: VoiceLists-${{ env.VERSION }}.apk
+      - name: Publish as a release for this version
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest
-          name: Voice Lists (latest build)
-          files: VoiceLists.apk
+          tag_name: v${{ env.VERSION }}
+          name: Voice Lists ${{ env.VERSION }}
+          files: VoiceLists-${{ env.VERSION }}.apk
           make_latest: true

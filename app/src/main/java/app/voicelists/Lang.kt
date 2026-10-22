@@ -50,9 +50,9 @@ class Str(val he: Boolean) {
     private fun t(en: String, hebrew: String) = if (he) hebrew else en
 
     val appName = t("Voice Lists", "רשימות קוליות")
-    val categories = t("Lists", "רשימות")
-    val newCategory = t("New list", "רשימה חדשה")
-    val categoryName = t("List name", "שם הרשימה")
+    val newList = t("New list", "רשימה חדשה")
+    val newCategory = t("New category", "קטגוריה חדשה")
+    val categories = t("Categories", "קטגוריות")
     val newItem = t("New item", "פריט חדש")
     val add = t("Add", "הוסף")
     val cancel = t("Cancel", "ביטול")
@@ -61,6 +61,11 @@ class Str(val he: Boolean) {
     val rename = t("Rename", "שנה שם")
     val clearChecked = t("Remove checked items", "מחק פריטים מסומנים")
     val deleteList = t("Delete list", "מחק רשימה")
+    val closeList = t("Close list", "סגור רשימה")
+    val reopenList = t("Reopen list", "פתח רשימה מחדש")
+    val closed = t("Closed", "סגורה")
+    val closedLists = t("Closed lists", "רשימות סגורות")
+    val listClosedNote = t("This list is closed. Reopen it to add items.", "הרשימה סגורה. פתחו אותה מחדש כדי להוסיף פריטים.")
     val language = t("Language", "שפה")
     val langAuto = t("Automatic (keyboard)", "אוטומטי (לפי המקלדת)")
     val langHebrew = "עברית"
@@ -69,17 +74,27 @@ class Str(val he: Boolean) {
     val empty = t("No lists yet. Tap + to create one, or add an item by voice.",
         "אין עדיין רשימות. הקישו + כדי ליצור רשימה, או הוסיפו פריט בקול.")
     val emptyList = t("This list is empty.", "הרשימה ריקה.")
+    val noCategories = t("No categories yet.", "אין עדיין קטגוריות.")
+    val otherCategory = t("Other", "אחר")
+    val firstListName = t("My list", "הרשימה שלי")
+    fun defaultListName(date: String) = t("List $date", "רשימה $date")
     val widgetHint = t("Tip: long-press your home screen, choose Widgets, and add \"Voice Lists\" for one-tap adding.",
         "טיפ: לחיצה ארוכה על מסך הבית, בחרו ווידג'טים והוסיפו את \"רשימות קוליות\" להוספה בלחיצה אחת.")
     fun confirmDelete(name: String) = t("Delete \"$name\" and all its items?", "למחוק את \"$name\" ואת כל הפריטים שבה?")
+    fun confirmDeleteCategory(name: String) = t("Delete the category \"$name\"?", "למחוק את הקטגוריה \"$name\"?")
+    fun categoryInUse(name: String, count: Int) = t("\"$name\" is used by $count items. Move them to another category first.",
+        "בקטגוריה \"$name\" יש $count פריטים. העבירו אותם קודם לקטגוריה אחרת.")
+    fun itemCount(n: Int) = t("$n items", "$n פריטים")
 
     // Voice flow
     val sayItem = t("What would you like to add?", "מה להוסיף?")
     val sayItemHint = t("Say the item, then say \"add\".", "אמרו את הפריט, ואז \"הוסף\".")
     fun heardItem(item: String) = t("\"$item\". Say \"add\" to continue.", "\"$item\". אמרו \"הוסף\" כדי להמשיך.")
-    fun alreadyExists(item: String, cat: String) = t("$item is already in $cat.", "$item כבר נמצא ב$cat.")
+    fun alreadyExists(item: String, list: String) = t("$item is already in $list.", "$item כבר נמצא ב$list.")
     val askCategory = t("Which category?", "לאיזו קטגוריה?")
-    fun added(item: String, cat: String) = t("Added $item to $cat.", "$item נוסף ל$cat.")
+    val askList = t("Which list?", "לאיזו רשימה?")
+    val listHint = t("Say the name of the list.", "אמרו את שם הרשימה.")
+    fun added(item: String, cat: String, list: String) = t("Added $item to $cat in $list.", "$item נוסף ל$cat ב$list.")
     fun unknownCategory(cat: String, item: String) = t(
         "I didn't find the category $cat. Should I create it and add $item? Say yes or add, or say again.",
         "לא מצאתי את הקטגוריה $cat. ליצור אותה ולהוסיף את $item? אמרו כן או הוסף, או שוב.")
@@ -88,7 +103,6 @@ class Str(val he: Boolean) {
     val sayNewCategory = t("Say the new category name.", "אמרו את שם הקטגוריה החדשה.")
     val newCategoryButton = t("+ New category", "+ קטגוריה חדשה")
     val type = t("Type", "הקלדה")
-    fun created(cat: String, item: String) = t("Created $cat and added $item.", "יצרתי את $cat והוספתי את $item.")
     val listening = t("Listening…", "מקשיב…")
     val notHeard = t("I didn't catch that. Tap the mic to try again.", "לא שמעתי. הקישו על המיקרופון כדי לנסות שוב.")
     val micPermission = t("Voice Lists needs the microphone to hear you.", "האפליקציה צריכה גישה למיקרופון כדי לשמוע אתכם.")
@@ -96,14 +110,12 @@ class Str(val he: Boolean) {
     val yes = t("Yes, create", "כן, צור")
     val again = t("Say again", "שוב")
     val mic = t("Listen", "האזן")
-    val item = t("Item", "פריט")
     val category = t("Category", "קטגוריה")
     val widgetLabel = t("Add item", "הוסף פריט")
 
-    // Lists screen
-    val moveTo = t("Move to…", "העבר ל…")
-    fun movedTo(item: String, cat: String) = t("Moved $item to $cat", "$item הועבר ל$cat")
-    fun addedTo(item: String, cat: String) = t("Added $item to $cat", "$item נוסף ל$cat")
+    // Screens
+    val moveToCategory = t("Change category…", "העבר לקטגוריה…")
+    val moveToList = t("Move to another list…", "העבר לרשימה אחרת…")
+    fun movedTo(item: String, target: String) = t("Moved $item to $target", "$item הועבר ל$target")
     val newItemHint = t("New item (dictate, then say \"add\")", "פריט חדש (הכתיבו ואמרו \"הוסף\")")
-    val noItems = t("No items", "אין פריטים")
 }
