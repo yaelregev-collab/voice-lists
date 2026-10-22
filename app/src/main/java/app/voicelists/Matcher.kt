@@ -1,0 +1,88 @@
+package app.voicelists
+
+import java.util.Locale
+
+/** Text comparison for spoken input in Hebrew and English. */
+object Matcher {
+    private val ADD = setOf("add", "add it", "ok add", "okay add", "please add", "אד",
+        "הוסף", "הוסיפי", "תוסיף", "תוסיפי", "להוסיף", "הוספה", "תוסיף את זה", "תוסיפי את זה")
+    private val YES = setOf("yes", "yeah", "yep", "sure", "ok", "okay", "create", "create it", "yes please",
+        "כן", "בטח", "אישור", "צור", "תיצור", "תיצרי", "כן תיצור", "כן תיצרי", "בסדר", "יס")
+    private val AGAIN = setOf("again", "try again", "retry", "no", "repeat", "nope",
+        "שוב", "עוד פעם", "נסה שוב", "נסי שוב", "לא", "מחדש")
+    private val CANCEL = setOf("cancel", "stop", "never mind", "nevermind", "quit", "exit",
+        "ביטול", "בטל", "בטלי", "עצור", "עצרי", "לא משנה", "צא")
+
+    fun normalize(s: String): String =
+        s.lowercase(Locale.ROOT)
+            .replace(Regex("[\\p{Punct}״׳]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+    fun isAdd(s: String) = normalize(s) in ADD
+    fun isYes(s: String) = normalize(s) in YES
+    fun isAgain(s: String) = normalize(s) in AGAIN
+    fun isCancel(s: String) = normalize(s) in CANCEL
+
+    /** "milk add" -> "milk". Returns null when the phrase doesn't end with an add word. */
+    fun stripTrailingAdd(s: String): String? {
+        val words = normalize(s).split(" ")
+        for (n in 3 downTo 1) {
+            if (words.size > n && words.takeLast(n).joinToString(" ") in ADD) {
+                return s.trim().split(Regex("\\s+")).dropLast(n).joinToString(" ").trim().trimEnd('.', ',', '!', '?').ifEmpty { null }
+            }
+        }
+        return null
+    }
+
+    /** Forms of a phrase to compare: as is, and without the Hebrew prefixes ה / ו / ל. */
+    private fun forms(s: String): Set<String> {
+        val n = normalize(s)
+        val out = mutableSetOf(n)
+        val stripped = n.split(" ").joinToString(" ") { w ->
+            if (w.length > 2 && (w[0] == 'ה' || w[0] == 'ו' || w[0] == 'ל')) w.substring(1) else w
+        }
+        out.add(stripped)
+        // English plural "s"
+        if (n.length > 3 && n.endsWith("s")) out.add(n.dropLast(1))
+        return out
+    }
+
+    fun sameText(a: String, b: String): Boolean = forms(a).intersect(forms(b)).isNotEmpty()
+
+    /** Best matching category for a spoken name, allowing small recognition mistakes. */
+    fun findCategory(categories: List<Category>, spoken: String): Category? {
+        categories.firstOrNull { sameText(it.name, spoken) }?.let { return it }
+        var best: Category? = null
+        var bestDist = Int.MAX_VALUE
+        for (c in categories) {
+            for (a in forms(c.name)) for (b in forms(spoken)) {
+                val d = distance(a, b)
+                val allowed = when {
+                    maxOf(a.length, b.length) <= 3 -> 0
+                    maxOf(a.length, b.length) <= 6 -> 1
+                    else -> 2
+                }
+                if (d <= allowed && d < bestDist) {
+                    best = c
+                    bestDist = d
+                }
+            }
+        }
+        return best
+    }
+
+    private fun distance(a: String, b: String): Int {
+        val dp = IntArray(b.length + 1) { it }
+        for (i in 1..a.length) {
+            var prev = dp[0]
+            dp[0] = i
+            for (j in 1..b.length) {
+                val tmp = dp[j]
+                dp[j] = minOf(dp[j] + 1, dp[j - 1] + 1, prev + if (a[i - 1] == b[j - 1]) 0 else 1)
+                prev = tmp
+            }
+        }
+        return dp[b.length]
+    }
+}
