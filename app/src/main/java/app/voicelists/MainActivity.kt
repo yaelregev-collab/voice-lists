@@ -3,7 +3,9 @@ package app.voicelists
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.text.InputType
 import android.view.Gravity
 import android.view.KeyEvent
@@ -19,9 +21,19 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
+import android.widget.Toast
 
 /** The lists, open ones first. Items added here ask for a category, then a list. */
 class MainActivity : Activity() {
+
+    companion object {
+        private const val REQ_BACKUP_FILE = 10
+        private const val REQ_RESTORE_FILE = 11
+        private const val MENU_BACKUP = 1
+        private const val MENU_RESTORE = 2
+        private const val MENU_LANGUAGE = 3
+        private const val MENU_VERSION = 4
+    }
 
     private sealed class Row {
         class Open(val list: ItemList) : Row()
@@ -32,7 +44,8 @@ class MainActivity : Activity() {
     private lateinit var s: Str
     private var data = Data(mutableListOf(), mutableListOf())
     private var rows = listOf<Row>()
-    private lateinit var emptyView: TextView
+    private lateinit var emptyView: View
+    private lateinit var backupBanner: View
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,6 +70,7 @@ class MainActivity : Activity() {
             (if (closed.isEmpty()) emptyList() else listOf(Row.ClosedHeader) + closed.map { Row.Closed(it) })
         adapter.notifyDataSetChanged()
         emptyView.visibility = if (data.lists.isEmpty()) View.VISIBLE else View.GONE
+        backupBanner.visibility = if (Backup.isOn(this)) View.GONE else View.VISIBLE
     }
 
     private fun save() {
@@ -123,10 +137,26 @@ class MainActivity : Activity() {
                 true
             }
         }
-        emptyView = text(s.empty + "\n\n" + s.widgetHint, 16f).apply {
+        // A fresh install starts here: offer to bring the lists back from a backup file.
+        emptyView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(32), dp(48), dp(32), dp(32))
-            gravity = Gravity.CENTER
-            alpha = 0.7f
+            addView(text(s.empty + "\n\n" + s.widgetHint, 16f).apply {
+                gravity = Gravity.CENTER
+                alpha = 0.7f
+            })
+            addView(pill(s.restoreButton, filled = false) { chooseRestoreFile() },
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+                    .apply { topMargin = dp(24) })
+        }
+        backupBanner = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(20), dp(4), dp(16), dp(8))
+            addView(text(s.backupOff, 14f).apply { alpha = 0.8f },
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { marginEnd = dp(12) })
+            addView(pill(s.turnOnBackup) { chooseBackupFile() })
         }
         val content = FrameLayout(this).apply {
             addView(listView)
@@ -142,9 +172,12 @@ class MainActivity : Activity() {
             marginStart = dp(6); marginEnd = dp(6)
         }
         bar.addView(pill("+ " + s.newList, filled = false) { newList() }, lp)
-        bar.addView(pill(s.categories, filled = false) { manageCategories() }, lp)
+        bar.addView(pill(s.categories, filled = false) {
+            startActivity(Intent(this, CategoriesActivity::class.java))
+        }, lp)
 
         root.addView(top)
+        root.addView(backupBanner)
         root.addView(content, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         root.addView(bar)
         setContentView(root)
@@ -203,49 +236,28 @@ class MainActivity : Activity() {
             .show()
     }
 
-    /** The shared categories: add, rename, delete (only when no item uses it). */
-    private fun manageCategories() {
-        val labels = data.categories.map { it.name } + s.newCategoryButton
-        AlertDialog.Builder(this)
-            .setTitle(s.categories)
-            .setItems(labels.toTypedArray()) { _, which ->
-                if (which == data.categories.size) {
-                    prompt(s.newCategory, "") { data.categoryNamed(it); save(); manageCategories() }
-                    return@setItems
-                }
-                val c = data.categories[which]
-                AlertDialog.Builder(this)
-                    .setTitle(c.name)
-                    .setItems(arrayOf(s.rename, s.delete)) { _, action ->
-                        if (action == 0) prompt(s.rename, c.name) { c.name = it; save(); manageCategories() }
-                        else deleteCategory(c)
-                    }
-                    .show()
-            }
-            .setNegativeButton(s.cancel, null)
-            .show()
-    }
-
-    private fun deleteCategory(c: Category) {
-        val used = data.lists.sumOf { l -> l.items.count { it.categoryId == c.id } }
-        if (used > 0) {
-            AlertDialog.Builder(this).setMessage(s.categoryInUse(c.name, used)).setPositiveButton(android.R.string.ok, null).show()
-            return
-        }
-        AlertDialog.Builder(this)
-            .setMessage(s.confirmDeleteCategory(c.name))
-            .setPositiveButton(s.delete) { _, _ -> data.categories.remove(c); save(); manageCategories() }
-            .setNegativeButton(s.cancel, null)
-            .show()
-    }
-
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menu.add(0, 1, 0, s.language)
+        menu.add(0, MENU_BACKUP, 0, s.backupMenu)
+        menu.add(0, MENU_RESTORE, 1, s.restoreMenu)
+        menu.add(0, MENU_LANGUAGE, 2, s.language)
+        menu.add(0, MENU_VERSION, 3, s.version(versionName())).isEnabled = false
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId != 1) return super.onOptionsItemSelected(item)
+        when (item.itemId) {
+            MENU_BACKUP -> backupSettings()
+            MENU_RESTORE -> chooseRestoreFile()
+            MENU_LANGUAGE -> chooseLanguage()
+            else -> return super.onOptionsItemSelected(item)
+        }
+        return true
+    }
+
+    private fun versionName(): String =
+        try { packageManager.getPackageInfo(packageName, 0).versionName ?: "" } catch (e: Exception) { "" }
+
+    private fun chooseLanguage() {
         val values = arrayOf(Lang.AUTO, Lang.HEBREW, Lang.ENGLISH)
         val labels = arrayOf(s.langAuto, s.langHebrew, s.langEnglish)
         AlertDialog.Builder(this)
@@ -258,8 +270,89 @@ class MainActivity : Activity() {
                 reload()
             }
             .show()
-        return true
     }
+
+    // ---- Backup ----
+
+    /** Lets the user pick where the backup file goes (Downloads by default). */
+    private fun chooseBackupFile() {
+        startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("application/json")
+            .putExtra(Intent.EXTRA_TITLE, Backup.FILE_NAME), REQ_BACKUP_FILE)
+    }
+
+    private fun chooseRestoreFile() {
+        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("*/*"), REQ_RESTORE_FILE)
+    }
+
+    private fun backupSettings() {
+        val uri = Backup.file(this) ?: return chooseBackupFile()
+        AlertDialog.Builder(this)
+            .setTitle(s.backupMenu)
+            .setMessage(s.backupOn(displayName(uri)))
+            .setPositiveButton(s.close, null)
+            .setNeutralButton(s.changeFile) { _, _ -> chooseBackupFile() }
+            .setNegativeButton(s.turnOff) { _, _ ->
+                Backup.turnOff(this)
+                refresh()
+            }
+            .show()
+    }
+
+    private fun displayName(uri: Uri): String = try {
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    } catch (e: Exception) {
+        null
+    } ?: Backup.FILE_NAME
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, result: Intent?) {
+        super.onActivityResult(requestCode, resultCode, result)
+        val uri = result?.data
+        if (resultCode != RESULT_OK || uri == null) return
+        when (requestCode) {
+            REQ_BACKUP_FILE -> {
+                if (Backup.use(this, uri)) {
+                    Backup.write(this, Store.toJson(Store.load(this)))
+                    toast(s.backupStarted)
+                } else toast(s.backupFailed)
+                refresh()
+            }
+            REQ_RESTORE_FILE -> restore(uri)
+        }
+    }
+
+    private fun restore(uri: Uri) {
+        val restored = try {
+            Store.parse(Backup.read(this, uri))
+        } catch (e: Exception) {
+            null
+        }
+        if (restored == null) {
+            toast(s.notBackup)
+            return
+        }
+        fun replaceWithBackup() {
+            data = restored
+            // Keep backing up to the same file from now on.
+            Backup.use(this, uri)
+            Store.save(this, data)
+            refresh()
+            toast(s.restored(data.lists.size))
+        }
+        if (Store.load(this).lists.isEmpty()) replaceWithBackup()
+        else AlertDialog.Builder(this)
+            .setMessage(s.restoreConfirm(restored.lists.size))
+            .setPositiveButton(s.restore) { _, _ -> replaceWithBackup() }
+            .setNegativeButton(s.cancel, null)
+            .show()
+    }
+
+    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 }
 
 /** A one-field text dialog. */

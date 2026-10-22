@@ -53,6 +53,11 @@ object Store {
     fun load(ctx: Context): Data {
         val prefs = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val raw = prefs.getString(KEY, null) ?: return migrate(ctx, prefs.getString(OLD_KEY, null))
+        return parse(raw)
+    }
+
+    /** Reads the saved document, which is also the backup file's format. Throws on anything else. */
+    fun parse(raw: String): Data {
         val o = JSONObject(raw)
         val categories = mutableListOf<Category>()
         val cats = o.getJSONArray("categories")
@@ -97,6 +102,13 @@ object Store {
     }
 
     fun save(ctx: Context, data: Data) {
+        val json = toJson(data)
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, json).apply()
+        Backup.write(ctx, json)
+        AddItemWidget.refreshAll(ctx)
+    }
+
+    fun toJson(data: Data): String {
         val cats = JSONArray()
         for (c in data.categories) cats.put(JSONObject().put("id", c.id).put("name", c.name))
         val lists = JSONArray()
@@ -107,9 +119,8 @@ object Store {
             }
             lists.put(JSONObject().put("id", l.id).put("name", l.name).put("closed", l.closed).put("items", items))
         }
-        val o = JSONObject().put("categories", cats).put("lists", lists)
-        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, o.toString()).apply()
-        AddItemWidget.refreshAll(ctx)
+        return JSONObject().put("app", "voicelists").put("format", 2)
+            .put("categories", cats).put("lists", lists).toString(1)
     }
 
     private var lastId = 0L

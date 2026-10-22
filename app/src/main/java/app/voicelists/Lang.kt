@@ -82,9 +82,38 @@ class Str(val he: Boolean) {
         "טיפ: לחיצה ארוכה על מסך הבית, בחרו ווידג'טים והוסיפו את \"רשימות קוליות\" להוספה בלחיצה אחת.")
     fun confirmDelete(name: String) = t("Delete \"$name\" and all its items?", "למחוק את \"$name\" ואת כל הפריטים שבה?")
     fun confirmDeleteCategory(name: String) = t("Delete the category \"$name\"?", "למחוק את הקטגוריה \"$name\"?")
-    fun categoryInUse(name: String, count: Int) = t("\"$name\" is used by $count items. Move them to another category first.",
-        "בקטגוריה \"$name\" יש $count פריטים. העבירו אותם קודם לקטגוריה אחרת.")
-    fun itemCount(n: Int) = t("$n items", "$n פריטים")
+    fun itemCount(n: Int) = if (n == 1) t("1 item", "פריט אחד") else t("$n items", "$n פריטים")
+    fun deleteMoveTitle(name: String, n: Int) = if (n == 1)
+        t("Delete \"$name\": move its item to…", "מחיקת \"$name\": לאן להעביר את הפריט שבה?")
+        else t("Delete \"$name\": move its $n items to…", "מחיקת \"$name\": לאן להעביר את $n הפריטים שבה?")
+    val deleteItemsToo = t("Delete the items too", "מחק גם את הפריטים")
+    fun confirmDeleteWithItems(name: String, n: Int) = t("Delete \"$name\" and its $n items from all lists?",
+        "למחוק את \"$name\" ואת $n הפריטים שבה מכל הרשימות?")
+    fun mergeConfirm(name: String) = t("A category named \"$name\" already exists. Merge the two?",
+        "כבר יש קטגוריה בשם \"$name\". לאחד את שתיהן?")
+    val merge = t("Merge", "איחוד")
+    fun categoryExists(name: String) = t("\"$name\" already exists.", "\"$name\" כבר קיימת.")
+    fun movedItems(n: Int, target: String) = t("Moved $n items to $target", "$n פריטים הועברו ל$target")
+
+    // Backup
+    val backupOff = t("Automatic backup is off. Turn it on so your lists are never lost.",
+        "הגיבוי האוטומטי כבוי. הפעילו אותו כדי שהרשימות לא ילכו לאיבוד.")
+    val turnOnBackup = t("Turn on", "הפעלה")
+    val backupMenu = t("Automatic backup…", "גיבוי אוטומטי…")
+    val restoreMenu = t("Restore from backup…", "שחזור מגיבוי…")
+    val restoreButton = t("Restore from backup", "שחזור מגיבוי")
+    fun backupOn(file: String) = t("Every change is saved automatically to \"$file\".", "כל שינוי נשמר אוטומטית בקובץ \"$file\".")
+    val backupStarted = t("Automatic backup is on", "הגיבוי האוטומטי פועל")
+    val changeFile = t("Another file", "קובץ אחר")
+    val turnOff = t("Turn off", "כיבוי")
+    val close = t("Close", "סגור")
+    val backupFailed = t("Couldn't back up to that file.", "לא ניתן לגבות לקובץ הזה.")
+    fun restoreConfirm(lists: Int) = t("Replace your current lists with the backup ($lists lists)?",
+        "להחליף את הרשימות הנוכחיות בגיבוי ($lists רשימות)?")
+    val restore = t("Restore", "שחזר")
+    fun restored(lists: Int) = t("Restored $lists lists", "שוחזרו $lists רשימות")
+    val notBackup = t("That file isn't a Voice Lists backup.", "הקובץ הזה אינו גיבוי של רשימות קוליות.")
+    fun version(v: String) = t("Version $v", "גרסה $v")
 
     // Voice flow
     val sayItem = t("What would you like to add?", "מה להוסיף?")

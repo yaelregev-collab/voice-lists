@@ -11,8 +11,8 @@ android {
         applicationId = "app.voicelists"
         minSdk = 31
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 6
+        versionName = "1.5"
     }
 
     // A fixed key, kept in the repo, so every build can be installed over the previous one.

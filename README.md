@@ -26,6 +26,14 @@ The window acts on "add" / "הוסף" as soon as it's heard, and also accepts it
 - Inside a list, items are grouped by category. Tap **⇄** to change an item's category; long-press for
   move to another list, rename, delete.
 - Dictating with the keyboard mic and ending with "add" / "הוסף" adds the item straight away.
+- **Categories** screen: every category with its item count. Renaming changes it for every item in every list;
+  deleting asks where to move its items (or deletes them too, if chosen). Renaming to an existing name merges the two.
+
+## Keeping your lists
+- Installing a new version over the installed one keeps everything. Don't uninstall first: uninstalling erases the app's data.
+  Android refuses to install an older version over a newer one, so always open the file with the highest version number.
+- **Automatic backup** (banner on the main screen, or Menu → Automatic backup): pick a file once (Downloads by default)
+  and every change is written to it. After a reinstall, the empty main screen offers **Restore from backup**.
 
 ## Language
 Menu → Language: **Automatic** follows the keyboard's current language (then the phone's language),
