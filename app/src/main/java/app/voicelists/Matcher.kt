@@ -4,8 +4,8 @@ import java.util.Locale
 
 /** Text comparison for spoken input in Hebrew and English. */
 object Matcher {
-    private val ADD = setOf("add", "add it", "ok add", "okay add", "please add", "אד",
-        "הוסף", "הוסיפי", "תוסיף", "תוסיפי", "להוסיף", "הוספה", "תוסיף את זה", "תוסיפי את זה")
+    private val ADD = setOf("add", "add it", "ok add", "okay add", "please add", "add that", "אד",
+        "הוסף", "הוסיפי", "הוסיפו", "תוסיף", "תוסיפי", "תוסיפו", "להוסיף", "הוספה", "תוסיף את זה", "תוסיפי את זה")
     private val YES = setOf("yes", "yeah", "yep", "sure", "ok", "okay", "create", "create it", "yes please",
         "כן", "בטח", "אישור", "צור", "תיצור", "תיצרי", "כן תיצור", "כן תיצרי", "בסדר", "יס")
     private val AGAIN = setOf("again", "try again", "retry", "no", "repeat", "nope",
@@ -30,6 +30,17 @@ object Matcher {
         for (n in 3 downTo 1) {
             if (words.size > n && words.takeLast(n).joinToString(" ") in ADD) {
                 return s.trim().split(Regex("\\s+")).dropLast(n).joinToString(" ").trim().trimEnd('.', ',', '!', '?').ifEmpty { null }
+            }
+        }
+        return null
+    }
+
+    /** "add milk" -> "milk". Returns null when the phrase doesn't start with an add word. */
+    fun stripLeadingAdd(s: String): String? {
+        val words = normalize(s).split(" ")
+        for (n in 3 downTo 1) {
+            if (words.size > n && words.take(n).joinToString(" ") in ADD) {
+                return s.trim().split(Regex("\\s+")).drop(n).joinToString(" ").trim().trimEnd('.', ',', '!', '?').ifEmpty { null }
             }
         }
         return null

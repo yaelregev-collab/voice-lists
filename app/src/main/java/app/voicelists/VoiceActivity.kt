@@ -21,7 +21,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * The small floating window the widget opens. It listens for an item, waits for "add",
+ * The small floating window the widget opens. It listens for an item, adds as soon as it hears "add",
  * asks for the category, and saves. Questions are read aloud with text-to-speech.
  */
 class VoiceActivity : Activity() {
@@ -135,6 +135,7 @@ class VoiceActivity : Activity() {
                     return
                 }
                 val withAdd = results.firstNotNullOfOrNull { Matcher.stripTrailingAdd(it) }
+                    ?: results.firstNotNullOfOrNull { Matcher.stripLeadingAdd(it) }
                 if (withAdd != null) {
                     item = withAdd
                     itemConfirmed()
@@ -272,7 +273,15 @@ class VoiceActivity : Activity() {
         override fun onEndOfSpeech() {}
         override fun onPartialResults(partialResults: Bundle?) {
             val p = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-            if (!p.isNullOrBlank()) heardView.text = p
+            if (p.isNullOrBlank()) return
+            heardView.text = p
+            // Act on "add" / "הוסף" the moment it's heard, without waiting for the pause at the end.
+            if (step != Step.ITEM || !listening) return
+            val withAdd = Matcher.stripTrailingAdd(p)
+            when {
+                withAdd != null -> { stopListening(); item = withAdd; itemConfirmed() }
+                item != null && Matcher.isAdd(p) -> { stopListening(); itemConfirmed() }
+            }
         }
         override fun onEvent(eventType: Int, params: Bundle?) {}
 

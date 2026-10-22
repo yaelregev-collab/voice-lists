@@ -13,6 +13,14 @@ widget for adding items by voice, in Hebrew or English.
    or **"again"** / **"שוב"** to say the category again. **"cancel"** / **"ביטול"** stops at any point.
 
 Every step also has buttons, and existing categories show as tap-able chips.
+The window acts on "add" / "הוסף" as soon as it's heard, and also accepts it first ("add milk").
+
+## In the app
+- The main screen shows every category with its items underneath. Tap a heading to open that category,
+  long-press it to rename or delete it, and use **+ New list** to create a category by hand.
+- Type or dictate in the box at the top. Dictating with the keyboard mic and ending with "add" / "הוסף"
+  adds the item straight away and asks for the category.
+- Tap **⇄** next to an item to move it to another category (or long-press the item for move, rename, delete).
 
 A widget can't switch on the keyboard's dictation, so the window uses Android's speech recognizer
 (the same Google engine as Gboard's mic) and reads questions aloud with text-to-speech.

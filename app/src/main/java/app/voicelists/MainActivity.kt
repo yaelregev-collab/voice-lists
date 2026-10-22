@@ -3,25 +3,39 @@ package app.voicelists
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.Paint
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.widget.BaseAdapter
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
+import android.widget.Toast
 
-/** The lists (categories), with item counts. */
+/** Every category with its items underneath; add by typing, dictating or voice; move items between categories. */
 class MainActivity : Activity() {
+
+    /** One row of the screen: a category heading, or an item under it. */
+    private sealed class Row {
+        class Header(val category: Category) : Row()
+        class Entry(val category: Category, val item: Item) : Row()
+        class Empty(val category: Category) : Row()
+    }
 
     private lateinit var s: Str
     private var categories = mutableListOf<Category>()
+    private var rows = listOf<Row>()
     private lateinit var listView: ListView
     private lateinit var emptyView: TextView
 
@@ -39,8 +53,22 @@ class MainActivity : Activity() {
 
     private fun reload() {
         categories = Store.load(this)
+        refresh()
+    }
+
+    private fun refresh() {
+        rows = categories.flatMap { c ->
+            // Open items first, checked items at the bottom.
+            val items = c.items.filter { !it.done } + c.items.filter { it.done }
+            listOf(Row.Header(c)) + if (items.isEmpty()) listOf(Row.Empty(c)) else items.map { Row.Entry(c, it) }
+        }
         adapter.notifyDataSetChanged()
         emptyView.visibility = if (categories.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    private fun save() {
+        Store.save(this, categories)
+        refresh()
     }
 
     private fun buildUi() {
@@ -49,16 +77,42 @@ class MainActivity : Activity() {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         Lang.applyDirection(root, s.he)
 
+        val input = EditText(this).apply {
+            hint = s.newItemHint
+            isSingleLine = true
+            imeOptions = EditorInfo.IME_ACTION_DONE
+        }
+        fun submit() {
+            val v = input.text.toString().trim()
+            if (v.isEmpty()) return
+            input.setText("")
+            addItem(v)
+        }
+        input.setOnEditorActionListener { _, action, event ->
+            if (action == EditorInfo.IME_ACTION_DONE || event?.keyCode == KeyEvent.KEYCODE_ENTER) { submit(); true } else false
+        }
+        input.submitOnDictatedAdd { addItem(it) }
+        val voice = ImageButton(this).apply {
+            setImageResource(R.drawable.ic_mic)
+            setColorFilter(accent())
+            background = null
+            contentDescription = s.voiceAdd
+            setOnClickListener { startActivity(Intent(this@MainActivity, VoiceActivity::class.java)) }
+        }
+        val top = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(16), dp(8), dp(8), dp(8))
+            addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(pill(s.add) { submit() })
+            addView(voice, LinearLayout.LayoutParams(dp(48), dp(48)))
+        }
+
         listView = ListView(this).apply {
             adapter = this@MainActivity.adapter
             divider = null
-            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setPadding(dp(8), 0, dp(8), dp(8))
             clipToPadding = false
-            setOnItemClickListener { _, _, pos, _ ->
-                startActivity(Intent(this@MainActivity, CategoryActivity::class.java)
-                    .putExtra(CategoryActivity.EXTRA_ID, categories[pos].id))
-            }
-            setOnItemLongClickListener { _, _, pos, _ -> editCategory(categories[pos]); true }
         }
         emptyView = text(s.empty + "\n\n" + s.widgetHint, 16f).apply {
             setPadding(dp(32), dp(48), dp(32), dp(32))
@@ -83,6 +137,7 @@ class MainActivity : Activity() {
             startActivity(Intent(this, VoiceActivity::class.java))
         }, lp)
 
+        root.addView(top)
         root.addView(content, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         root.addView(bar)
         setContentView(root)
@@ -90,27 +145,111 @@ class MainActivity : Activity() {
     }
 
     private val adapter = object : BaseAdapter() {
-        override fun getCount() = categories.size
-        override fun getItem(position: Int) = categories[position]
-        override fun getItemId(position: Int) = categories[position].id
-        override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
-            val c = categories[position]
-            val row = LinearLayout(this@MainActivity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(20), dp(18), dp(20), dp(18))
+        override fun getCount() = rows.size
+        override fun getItem(position: Int) = rows[position]
+        override fun getItemId(position: Int) = position.toLong()
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View =
+            when (val r = rows[position]) {
+                is Row.Header -> header(r.category)
+                is Row.Entry -> entry(r.category, r.item)
+                is Row.Empty -> text(s.noItems, 15f).apply {
+                    alpha = 0.5f
+                    setPadding(dp(20), dp(4), dp(20), dp(8))
+                }
             }
-            row.addView(text(c.name, 18f), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            row.addView(text(c.openCount.toString(), 16f).apply { alpha = 0.6f })
-            return row
+    }
+
+    private fun header(c: Category): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(12), dp(20), dp(12), dp(6))
+        addView(text(c.name, 19f, bold = true).apply { setTextColor(accent()) },
+            LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        addView(text(c.openCount.toString(), 15f).apply { alpha = 0.6f })
+        setOnClickListener {
+            startActivity(Intent(this@MainActivity, CategoryActivity::class.java)
+                .putExtra(CategoryActivity.EXTRA_ID, c.id))
+        }
+        setOnLongClickListener { editCategory(c); true }
+    }
+
+    private fun entry(c: Category, item: Item): View {
+        val check = CheckBox(this).apply {
+            text = item.text
+            textSize = 17f
+            isChecked = item.done
+            setPadding(dp(8), dp(10), dp(8), dp(10))
+            paintFlags = if (item.done) paintFlags or Paint.STRIKE_THRU_TEXT_FLAG else paintFlags and Paint.STRIKE_THRU_TEXT_FLAG.inv()
+            alpha = if (item.done) 0.5f else 1f
+            setOnClickListener {
+                item.done = !item.done
+                save()
+            }
+            setOnLongClickListener { itemMenu(c, item); true }
+        }
+        // One tap to move the item to another category.
+        val move = text("⇄", 22f).apply {
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            setTextColor(accent())
+            contentDescription = s.moveTo
+            setOnClickListener { moveItem(c, item) }
+        }
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), 0, dp(4), 0)
+            addView(check, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(move)
         }
     }
+
+    private fun addItem(raw: String) {
+        val text = raw.trim().replaceFirstChar { it.uppercase(s.locale) }
+        val existing = Store.findOpenItem(categories, text)
+        if (existing != null) {
+            toast(s.alreadyExists(text, existing.first.name))
+            return
+        }
+        pickCategory("${s.askCategory} ($text)", categories) { c ->
+            Store.addItem(c, text)
+            save()
+            toast(s.addedTo(text, c.name))
+        }
+    }
+
+    private fun moveItem(from: Category, item: Item) {
+        pickCategory("${s.moveTo} (${item.text})", categories, exclude = from) { to ->
+            Store.moveItem(item, from, to)
+            save()
+            toast(s.movedTo(item.text, to.name))
+        }
+    }
+
+    private fun itemMenu(c: Category, item: Item) {
+        AlertDialog.Builder(this)
+            .setTitle(item.text)
+            .setItems(arrayOf(s.moveTo, s.rename, s.delete)) { _, which ->
+                when (which) {
+                    0 -> moveItem(c, item)
+                    1 -> prompt(s.rename, item.text) {
+                        item.text = it
+                        save()
+                    }
+                    else -> {
+                        c.items.remove(item)
+                        save()
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 
     private fun newCategory() {
         prompt(s.newCategory, "") { name ->
             categories.add(Category(Store.newId(), name))
-            Store.save(this, categories)
-            reload()
+            save()
         }
     }
 

@@ -62,4 +62,12 @@ object Store {
         category.items.removeAll { it.done && Matcher.sameText(it.text, text) }
         category.items.add(Item(newId(), text.trim()))
     }
+
+    /** Moves an item to another category (dropping a checked-off copy already there). */
+    fun moveItem(item: Item, from: Category, to: Category) {
+        if (from === to) return
+        from.items.remove(item)
+        to.items.removeAll { it.done && Matcher.sameText(it.text, item.text) }
+        to.items.add(item)
+    }
 }

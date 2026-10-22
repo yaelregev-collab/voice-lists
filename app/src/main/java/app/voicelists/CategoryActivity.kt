@@ -20,8 +20,9 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
+import android.widget.Toast
 
-/** One list: tick items off, add by typing or by voice, remove. */
+/** One category: tick items off, add by typing, dictating or voice, move or remove. */
 class CategoryActivity : Activity() {
 
     companion object {
@@ -41,21 +42,25 @@ class CategoryActivity : Activity() {
         Lang.applyDirection(root, s.he)
 
         val input = EditText(this).apply {
-            hint = s.newItem
+            hint = s.newItemHint
             isSingleLine = true
             imeOptions = EditorInfo.IME_ACTION_DONE
         }
-        fun submit() {
-            val v = input.text.toString().trim()
+        fun addText(raw: String) {
+            val v = raw.trim().replaceFirstChar { it.uppercase(s.locale) }
             val c = category ?: return
             if (v.isEmpty()) return
             if (Store.findOpenItem(categories, v) == null) {
                 Store.addItem(c, v)
                 Store.save(this, categories)
             }
-            input.setText("")
             refresh()
         }
+        fun submit() {
+            addText(input.text.toString())
+            input.setText("")
+        }
+        input.submitOnDictatedAdd { addText(it) }
         input.setOnEditorActionListener { _, action, event ->
             if (action == EditorInfo.IME_ACTION_DONE || event?.keyCode == KeyEvent.KEYCODE_ENTER) { submit(); true } else false
         }
@@ -121,7 +126,7 @@ class CategoryActivity : Activity() {
         override fun getItemId(position: Int) = shown[position].id
         override fun getView(position: Int, convertView: View?, parent: ViewGroup?): View {
             val item = shown[position]
-            return CheckBox(this@CategoryActivity).apply {
+            val check = CheckBox(this@CategoryActivity).apply {
                 text = item.text
                 textSize = 18f
                 isChecked = item.done
@@ -135,24 +140,50 @@ class CategoryActivity : Activity() {
                 }
                 setOnLongClickListener { itemMenu(item); true }
             }
+            val move = text("⇄", 22f).apply {
+                setPadding(dp(14), dp(6), dp(14), dp(6))
+                setTextColor(accent())
+                contentDescription = s.moveTo
+                setOnClickListener { moveItem(item) }
+            }
+            return LinearLayout(this@CategoryActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(check, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(move)
+            }
         }
     }
 
     private fun itemMenu(item: Item) {
         AlertDialog.Builder(this)
             .setTitle(item.text)
-            .setItems(arrayOf(s.rename, s.delete)) { _, which ->
-                if (which == 0) prompt(s.rename, item.text) {
-                    item.text = it
-                    Store.save(this, categories)
-                    refresh()
-                } else {
-                    category?.items?.remove(item)
-                    Store.save(this, categories)
-                    refresh()
+            .setItems(arrayOf(s.moveTo, s.rename, s.delete)) { _, which ->
+                when (which) {
+                    0 -> moveItem(item)
+                    1 -> prompt(s.rename, item.text) {
+                        item.text = it
+                        Store.save(this, categories)
+                        refresh()
+                    }
+                    else -> {
+                        category?.items?.remove(item)
+                        Store.save(this, categories)
+                        refresh()
+                    }
                 }
             }
             .show()
+    }
+
+    private fun moveItem(item: Item) {
+        val from = category ?: return
+        pickCategory("${s.moveTo} (${item.text})", categories, exclude = from) { to ->
+            Store.moveItem(item, from, to)
+            Store.save(this, categories)
+            refresh()
+            Toast.makeText(this, s.movedTo(item.text, to.name), Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

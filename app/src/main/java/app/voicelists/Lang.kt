@@ -93,4 +93,11 @@ class Str(val he: Boolean) {
     val item = t("Item", "פריט")
     val category = t("Category", "קטגוריה")
     val widgetLabel = t("Add item", "הוסף פריט")
+
+    // Lists screen
+    val moveTo = t("Move to…", "העבר ל…")
+    fun movedTo(item: String, cat: String) = t("Moved $item to $cat", "$item הועבר ל$cat")
+    fun addedTo(item: String, cat: String) = t("Added $item to $cat", "$item נוסף ל$cat")
+    val newItemHint = t("New item (dictate, then say \"add\")", "פריט חדש (הכתיבו ואמרו \"הוסף\")")
+    val noItems = t("No items", "אין פריטים")
 }
