@@ -5,13 +5,20 @@ import java.util.Locale
 /** Text comparison for spoken input in Hebrew and English. */
 object Matcher {
     private val ADD = setOf("add", "add it", "ok add", "okay add", "please add", "add that", "אד",
-        "הוסף", "הוסיפי", "הוסיפו", "תוסיף", "תוסיפי", "תוסיפו", "להוסיף", "הוספה", "תוסיף את זה", "תוסיפי את זה")
+        "הוסף", "הוסיפי", "הוסיפו", "תוסיף", "תוסיפי", "תוסיפו", "להוסיף", "הוספה", "תוסיף את זה", "תוסיפי את זה",
+        // How the recognizer often mishears "הוסף"
+        "יוסף", "josef", "joseph", "yosef", "hosef", "הוסיף")
     private val YES = setOf("yes", "yeah", "yep", "sure", "ok", "okay", "create", "create it", "yes please",
         "כן", "בטח", "אישור", "צור", "תיצור", "תיצרי", "כן תיצור", "כן תיצרי", "בסדר", "יס")
     private val AGAIN = setOf("again", "try again", "retry", "no", "repeat", "nope",
         "שוב", "עוד פעם", "נסה שוב", "נסי שוב", "לא", "מחדש")
     private val CANCEL = setOf("cancel", "stop", "never mind", "nevermind", "quit", "exit",
         "ביטול", "בטל", "בטלי", "עצור", "עצרי", "לא משנה", "צא")
+
+    private val NEW_CATEGORY = listOf("new category", "new list", "create category", "create a category",
+        "add category", "add a category", "make category",
+        "קטגוריה חדשה", "רשימה חדשה", "צור קטגוריה", "תיצור קטגוריה", "תיצרי קטגוריה", "הוסף קטגוריה",
+        "צור רשימה", "קטגוריה חדש")
 
     fun normalize(s: String): String =
         s.lowercase(Locale.ROOT)
@@ -45,6 +52,25 @@ object Matcher {
         }
         return null
     }
+
+    /**
+     * "new category pharmacy" -> "pharmacy", "קטגוריה חדשה" -> "".
+     * Returns null when the phrase isn't a request for a new category.
+     */
+    fun stripNewCategory(s: String): String? {
+        val n = normalize(s)
+        for (p in NEW_CATEGORY) {
+            if (n == p) return ""
+            if (n.startsWith("$p ")) {
+                val rest = s.trim().split(Regex("\\s+")).drop(p.split(" ").size).joinToString(" ")
+                return (stripTrailingAdd(rest) ?: rest).trim().trimEnd('.', ',', '!', '?')
+            }
+        }
+        return null
+    }
+
+    /** The phrase without a leading or trailing add word, or null when it has none. */
+    fun stripAdd(s: String): String? = stripTrailingAdd(s) ?: stripLeadingAdd(s)
 
     /** Forms of a phrase to compare: as is, and without the Hebrew prefixes ה / ו / ל. */
     private fun forms(s: String): Set<String> {

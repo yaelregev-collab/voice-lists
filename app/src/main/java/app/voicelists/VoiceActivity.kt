@@ -32,7 +32,7 @@ class VoiceActivity : Activity() {
         private const val REQ_MIC = 1
     }
 
-    private enum class Step { ITEM, CATEGORY, CONFIRM, DONE }
+    private enum class Step { ITEM, CATEGORY, CONFIRM, NEW_CATEGORY, DONE }
 
     private lateinit var s: Str
     private lateinit var categories: MutableList<Category>
@@ -147,18 +147,39 @@ class VoiceActivity : Activity() {
                 showActions()
                 listen()
             }
-            Step.CATEGORY -> {
-                val match = results.firstNotNullOfOrNull { Matcher.findCategory(categories, it) }
-                if (match != null) addTo(match) else askCreate(first)
-            }
-            Step.CONFIRM -> when {
-                results.any { Matcher.isYes(it) } -> createAndAdd()
-                results.any { Matcher.isAgain(it) } -> askCategory()
-                else -> {
-                    // They may have just said a (different) category name.
-                    val match = results.firstNotNullOfOrNull { Matcher.findCategory(categories, it) }
-                    if (match != null) addTo(match) else askCreate(first)
+            Step.CATEGORY, Step.CONFIRM -> {
+                // "new category pharmacy" / "קטגוריה חדשה בית מרקחת"
+                val newName = results.firstNotNullOfOrNull { Matcher.stripNewCategory(it) }
+                if (newName != null) {
+                    if (newName.isEmpty()) askNewCategory() else createAndAdd(newName)
+                    return
                 }
+                if (results.any { Matcher.isAdd(it) || (step == Step.CONFIRM && Matcher.isYes(it)) }) {
+                    // "add" / "yes" on its own confirms the category read back, or waits for one.
+                    if (step == Step.CONFIRM) createAndAdd() else listen()
+                    return
+                }
+                if (step == Step.CONFIRM && results.any { Matcher.isAgain(it) }) {
+                    askCategory()
+                    return
+                }
+                // "pharmacy add": an existing category is used, a new one is created right away.
+                val stripped = results.firstNotNullOfOrNull { Matcher.stripAdd(it) }
+                val match = results.firstNotNullOfOrNull { Matcher.findCategory(categories, Matcher.stripAdd(it) ?: it) }
+                when {
+                    match != null -> addTo(match)
+                    stripped != null -> createAndAdd(stripped)
+                    else -> askCreate(first)
+                }
+            }
+            Step.NEW_CATEGORY -> {
+                if (results.all { Matcher.isAdd(it) }) {
+                    listen()
+                    return
+                }
+                val name = results.firstNotNullOfOrNull { Matcher.stripNewCategory(it)?.ifEmpty { null } }
+                    ?: Matcher.stripAdd(first) ?: first
+                createAndAdd(name)
             }
             Step.DONE -> {}
         }
@@ -184,7 +205,18 @@ class VoiceActivity : Activity() {
         pendingCategory = null
         titleView.text = s.askCategory
         showActions()
-        say(s.askCategory) { listen() }
+        say(s.askCategory) {
+            status(s.categoryHint)
+            listen()
+        }
+    }
+
+    private fun askNewCategory() {
+        step = Step.NEW_CATEGORY
+        pendingCategory = null
+        titleView.text = s.sayNewCategory
+        showActions()
+        say(s.sayNewCategory) { listen() }
     }
 
     private fun askCreate(spoken: String) {
@@ -196,21 +228,24 @@ class VoiceActivity : Activity() {
         say(s.unknownCategory(name, item ?: "")) { listen() }
     }
 
-    private fun createAndAdd() {
-        val name = pendingCategory ?: return askCategory()
+    private fun createAndAdd(spoken: String? = pendingCategory) {
+        val name = spoken?.trim()?.ifEmpty { null }?.replaceFirstChar { it.uppercase(s.locale) }
+            ?: return askCategory()
+        // Saying the name of a category that already exists just uses it.
+        categories.firstOrNull { Matcher.sameText(it.name, name) }?.let { return addTo(it) }
         val cat = Category(Store.newId(), name)
         categories.add(cat)
-        addTo(cat)
+        addTo(cat, created = true)
     }
 
-    private fun addTo(category: Category) {
+    private fun addTo(category: Category, created: Boolean = false) {
         val text = item ?: return
         Store.addItem(category, text)
         Store.save(this, categories)
         step = Step.DONE
         titleView.text = "✓ ${category.name}"
         showActions()
-        say(s.added(text, category.name)) { finish() }
+        say(if (created) s.created(category.name, text) else s.added(text, category.name)) { finish() }
     }
 
     // ---- Speech in and out ----
@@ -261,7 +296,7 @@ class VoiceActivity : Activity() {
 
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
-            if (step == Step.ITEM && item == null || step == Step.CATEGORY) status(s.listening)
+            if (step == Step.ITEM && item == null) status(s.listening)
         }
         override fun onBeginningOfSpeech() {}
         override fun onRmsChanged(rmsdB: Float) {
@@ -276,7 +311,15 @@ class VoiceActivity : Activity() {
             if (p.isNullOrBlank()) return
             heardView.text = p
             // Act on "add" / "הוסף" the moment it's heard, without waiting for the pause at the end.
-            if (step != Step.ITEM || !listening) return
+            if (!listening) return
+            if (step == Step.CATEGORY || step == Step.CONFIRM || step == Step.NEW_CATEGORY) {
+                if (Matcher.stripTrailingAdd(p) != null || (step == Step.CONFIRM && Matcher.isAdd(p))) {
+                    stopListening()
+                    onHeard(listOf(p))
+                }
+                return
+            }
+            if (step != Step.ITEM) return
             val withAdd = Matcher.stripTrailingAdd(p)
             when {
                 withAdd != null -> { stopListening(); item = withAdd; itemConfirmed() }
@@ -384,6 +427,10 @@ class VoiceActivity : Activity() {
         val gap = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             .apply { marginStart = dp(8) }
 
+        if (step == Step.CATEGORY || step == Step.CONFIRM) {
+            chipsScroll.visibility = View.VISIBLE
+            chips.addView(pill(s.newCategoryButton) { askNewCategory() }, gap)
+        }
         if (step == Step.CATEGORY && categories.isNotEmpty()) {
             chipsScroll.visibility = View.VISIBLE
             for (c in categories) {
@@ -397,6 +444,10 @@ class VoiceActivity : Activity() {
                 actions.addView(pill(s.again, filled = false) { askCategory() }, gap)
                 actions.addView(pill(s.yes) { createAndAdd() }, gap)
             }
+            Step.NEW_CATEGORY -> actions.addView(pill(s.type, filled = false) {
+                stopListening()
+                prompt(s.newCategory, "") { createAndAdd(it) }
+            }, gap)
             else -> {}
         }
     }

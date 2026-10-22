@@ -9,7 +9,9 @@ widget for adding items by voice, in Hebrew or English.
 3. If the item is already on a list, the app says so and closes.
 4. The app asks **"Which category?"** and listens again.
 5. If the category exists (small mishearings are tolerated), the item is saved and the window closes.
-6. If not, it reads the category back and asks whether to create it. Say **"yes"** / **"כן"** to create it,
+   Saying a new name followed by **"add"** / **"הוסף"** creates that category straight away,
+   and so does **"new category …"** / **"קטגוריה חדשה …"** or the **+ New category** button.
+6. If not, it reads the category back and asks whether to create it. Say **"yes"** / **"כן"** or **"add"** / **"הוסף"** to create it,
    or **"again"** / **"שוב"** to say the category again. **"cancel"** / **"ביטול"** stops at any point.
 
 Every step also has buttons, and existing categories show as tap-able chips.

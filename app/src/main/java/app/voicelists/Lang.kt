@@ -81,8 +81,14 @@ class Str(val he: Boolean) {
     val askCategory = t("Which category?", "לאיזו קטגוריה?")
     fun added(item: String, cat: String) = t("Added $item to $cat.", "$item נוסף ל$cat.")
     fun unknownCategory(cat: String, item: String) = t(
-        "I didn't find the category $cat. Should I create it and add $item? Say yes, or say again.",
-        "לא מצאתי את הקטגוריה $cat. ליצור אותה ולהוסיף את $item? אמרו כן, או שוב.")
+        "I didn't find the category $cat. Should I create it and add $item? Say yes or add, or say again.",
+        "לא מצאתי את הקטגוריה $cat. ליצור אותה ולהוסיף את $item? אמרו כן או הוסף, או שוב.")
+    val categoryHint = t("Say a category. A new name followed by \"add\" creates it.",
+        "אמרו קטגוריה. שם חדש ואחריו \"הוסף\" ייצור אותה.")
+    val sayNewCategory = t("Say the new category name.", "אמרו את שם הקטגוריה החדשה.")
+    val newCategoryButton = t("+ New category", "+ קטגוריה חדשה")
+    val type = t("Type", "הקלדה")
+    fun created(cat: String, item: String) = t("Created $cat and added $item.", "יצרתי את $cat והוספתי את $item.")
     val listening = t("Listening…", "מקשיב…")
     val notHeard = t("I didn't catch that. Tap the mic to try again.", "לא שמעתי. הקישו על המיקרופון כדי לנסות שוב.")
     val micPermission = t("Voice Lists needs the microphone to hear you.", "האפליקציה צריכה גישה למיקרופון כדי לשמוע אתכם.")
