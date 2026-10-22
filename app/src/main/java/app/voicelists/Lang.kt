@@ -142,6 +142,29 @@ class Str(val he: Boolean) {
     val category = t("Category", "קטגוריה")
     val widgetLabel = t("Add item", "הוסף פריט")
 
+    // Adding several items in a row to one category of one list
+    val batchTitle = t("Add many items", "הוספה ברצף")
+    val select = t("Select", "בחר")
+    val batchListHint = t("Say the list name, then \"select\".", "אמרו את שם הרשימה ואז \"בחר\".")
+    val batchCategoryHint = t("Say the category, then \"select\". A new name creates it.",
+        "אמרו את שם הקטגוריה ואז \"בחר\". שם חדש ייצור קטגוריה.")
+    fun heardChoice(name: String) = t("\"$name\". Say \"select\" to continue.", "\"$name\". אמרו \"בחר\" כדי להמשיך.")
+    fun listNotFound(name: String) = t("I didn't find an open list called $name. Should I create it? Say yes, or say again.",
+        "לא מצאתי רשימה פתוחה בשם $name. ליצור אותה? אמרו כן, או שוב.")
+    fun categoryCreated(name: String) = t("Created the category $name.", "יצרתי את הקטגוריה $name.")
+    val batchStart = t("Go ahead: say an item, then add.", "אפשר להתחיל: אמרו פריט ואז הוסף.")
+    val batchHint = t("Say an item, then \"add\". Say \"done\" when you're finished.",
+        "אמרו פריט ואז \"הוסף\". בסוף אמרו \"סיום\".")
+    val addedShort = t("Added", "נוסף")
+    fun alreadyInList(item: String) = t("$item is already on the list.", "$item כבר ברשימה.")
+    fun batchDone(n: Int, cat: String, list: String) = when (n) {
+        0 -> t("Nothing was added.", "לא נוספו פריטים.")
+        1 -> t("Added 1 item to $cat in $list.", "נוסף פריט אחד ל$cat ב$list.")
+        else -> t("Added $n items to $cat in $list.", "נוספו $n פריטים ל$cat ב$list.")
+    }
+    val doneButton = t("Done", "סיום")
+    val batchHere = t("Add many to this category", "הוספה ברצף לקטגוריה הזו")
+
     // Screens
     val moveToCategory = t("Change category…", "העבר לקטגוריה…")
     val moveToList = t("Move to another list…", "העבר לרשימה אחרת…")

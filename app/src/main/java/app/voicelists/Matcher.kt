@@ -14,6 +14,15 @@ object Matcher {
         "שוב", "עוד פעם", "נסה שוב", "נסי שוב", "לא", "מחדש")
     private val CANCEL = setOf("cancel", "stop", "never mind", "nevermind", "quit", "exit",
         "ביטול", "בטל", "בטלי", "עצור", "עצרי", "לא משנה", "צא")
+    // Picks the list or category just said. Written the way normalize() leaves them.
+    private val SELECT = setOf("select", "choose", "pick", "select it", "choose it", "select this", "choose this",
+        "בחר", "בחרי", "בחרו", "תבחר", "תבחרי", "תבחרו", "בחירה", "בחר את זה",
+        // How the recognizer sometimes hears "בחר"
+        "בכר")
+    // Ends adding several items in a row.
+    private val DONE = setOf("done", "finish", "finished", "i m done", "im done", "that s it", "thats it", "that s all",
+        "thats all", "end", "סיום", "סיימתי", "סיימנו", "זהו", "זה הכל", "זהו זה", "די", "מספיק", "לסיים", "סיים",
+        "תסיים", "תסיימי", "גמרתי", "גמרנו")
 
     private val NEW_CATEGORY = listOf("new category", "new list", "create category", "create a category",
         "add category", "add a category", "make category",
@@ -30,23 +39,36 @@ object Matcher {
     fun isYes(s: String) = normalize(s) in YES
     fun isAgain(s: String) = normalize(s) in AGAIN
     fun isCancel(s: String) = normalize(s) in CANCEL
+    fun isDone(s: String) = normalize(s) in DONE
+
+    /** "select" / "בחר" on its own; "add" is accepted too. */
+    fun isChoice(s: String) = normalize(s) in SELECT || isAdd(s)
 
     /** "milk add" -> "milk". Returns null when the phrase doesn't end with an add word. */
-    fun stripTrailingAdd(s: String): String? {
-        val words = normalize(s).split(" ")
+    fun stripTrailingAdd(s: String): String? = stripTrailing(s, ADD)
+
+    /** "add milk" -> "milk". Returns null when the phrase doesn't start with an add word. */
+    fun stripLeadingAdd(s: String): String? = stripLeading(s, ADD)
+
+    /** "Italy 2026 select" -> "Italy 2026" ("add" works too). Returns null without such a word. */
+    fun stripTrailingChoice(s: String): String? = stripTrailing(s, SELECT) ?: stripTrailingAdd(s)
+
+    fun stripChoice(s: String): String? = stripTrailingChoice(s) ?: stripLeading(s, SELECT)
+
+    private fun stripTrailing(s: String, words: Set<String>): String? {
+        val parts = normalize(s).split(" ")
         for (n in 3 downTo 1) {
-            if (words.size > n && words.takeLast(n).joinToString(" ") in ADD) {
+            if (parts.size > n && parts.takeLast(n).joinToString(" ") in words) {
                 return s.trim().split(Regex("\\s+")).dropLast(n).joinToString(" ").trim().trimEnd('.', ',', '!', '?').ifEmpty { null }
             }
         }
         return null
     }
 
-    /** "add milk" -> "milk". Returns null when the phrase doesn't start with an add word. */
-    fun stripLeadingAdd(s: String): String? {
-        val words = normalize(s).split(" ")
+    private fun stripLeading(s: String, words: Set<String>): String? {
+        val parts = normalize(s).split(" ")
         for (n in 3 downTo 1) {
-            if (words.size > n && words.take(n).joinToString(" ") in ADD) {
+            if (parts.size > n && parts.take(n).joinToString(" ") in words) {
                 return s.trim().split(Regex("\\s+")).drop(n).joinToString(" ").trim().trimEnd('.', ',', '!', '?').ifEmpty { null }
             }
         }
@@ -89,7 +111,11 @@ object Matcher {
 
     fun findCategory(categories: List<Category>, spoken: String): Category? = findNamed(categories, spoken) { it.name }
 
-    fun findList(lists: List<ItemList>, spoken: String): ItemList? = findNamed(lists, spoken) { it.name }
+    fun findList(lists: List<ItemList>, spoken: String): ItemList? = findNamed(lists, spoken) { it.name } ?: run {
+        // "Italy" for "Italy 2026": the one list whose name contains what was said.
+        val n = normalize(spoken)
+        if (n.length < 3) null else lists.singleOrNull { normalize(it.name).contains(n) }
+    }
 
     /** Best match for a spoken name, allowing small recognition mistakes. */
     private fun <T> findNamed(options: List<T>, spoken: String, name: (T) -> String): T? {

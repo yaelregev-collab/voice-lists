@@ -17,6 +17,17 @@ widget for adding items by voice, in Hebrew or English.
 Every step also has buttons, and existing categories show as tap-able chips.
 The window acts on "add" / "הוסף" as soon as it's heard, and also accepts it first ("add milk").
 
+## Adding many items in a row
+The second widget (**Add many items** / **הוספה ברצף**, a list-with-plus icon) is for filling one category of one list:
+1. It asks **which list**: say the name, then **"select"** / **"בחר"** ("Italy 2026 select"). Part of the name is enough
+   when only one open list contains it. An unknown name offers to create that list.
+2. It asks **which category**: say it, then **"select"** / **"בחר"**. A category that doesn't exist yet is created.
+3. Then say items one after another, each followed by **"add"** / **"הוסף"** ("3 shirts add", "4 pants add").
+   Every item goes into that category of that list. Say **"done"** / **"סיום"** to finish.
+
+In the app the same thing starts from the list-with-plus button at the top of the main screen or of a list,
+and from the button on each category heading inside a list (that one goes straight to step 3).
+
 ## In the app
 - **Lists → categories → items.** The main screen shows your lists (open ones first, closed ones below).
   Categories are one shared set used by every list (the **Categories** button adds, renames and deletes them).

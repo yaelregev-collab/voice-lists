@@ -2,10 +2,19 @@ package app.voicelists
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
 import android.text.Editable
 import android.text.TextWatcher
 import android.widget.EditText
 import android.widget.Toast
+
+/** Opens the voice window for adding several items in a row; the list and category are asked unless given. */
+fun Activity.startAddMany(list: ItemList? = null, category: Category? = null) {
+    val intent = Intent(this, VoiceActivity::class.java).putExtra(VoiceActivity.EXTRA_BATCH, true)
+    list?.let { intent.putExtra(VoiceActivity.EXTRA_LIST, it.id) }
+    category?.let { intent.putExtra(VoiceActivity.EXTRA_CATEGORY, it.id) }
+    startActivity(intent)
+}
 
 /** Asks which category to use: the shared ones, plus a new one typed by hand. */
 fun Activity.pickCategory(title: String, data: Data, exclude: Category? = null, onPick: (Category) -> Unit) {

@@ -113,6 +113,7 @@ class MainActivity : Activity() {
             addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(pill(s.add) { submit() })
             addView(voice, LinearLayout.LayoutParams(dp(48), dp(48)))
+            addView(iconButton(R.drawable.ic_batch, s.batchTitle) { startAddMany() }, LinearLayout.LayoutParams(dp(48), dp(48)))
         }
 
         val listView = ListView(this).apply {
@@ -265,7 +266,7 @@ class MainActivity : Activity() {
             .setSingleChoiceItems(labels, values.indexOf(Lang.setting(this))) { d, which ->
                 Lang.setSetting(this, values[which])
                 d.dismiss()
-                AddItemWidget.refreshAll(this)
+                refreshWidgets(this)
                 buildUi()
                 reload()
             }

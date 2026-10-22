@@ -3,4 +3,7 @@
     <string name="widget_name">Add item by voice</string>
     <string name="widget_description">Tap, say the item, then say \"add\".</string>
     <string name="widget_label">Add item</string>
+    <string name="widget_batch_name">Add many items by voice</string>
+    <string name="widget_batch_description">Tap, pick a list and a category, then say items one after another.</string>
+    <string name="widget_batch_label">Add many items</string>
 </resources>

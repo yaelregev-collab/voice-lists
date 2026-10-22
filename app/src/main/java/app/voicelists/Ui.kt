@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.TextView
 
 fun Context.dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
@@ -15,6 +16,15 @@ fun Context.text(value: String, sizeSp: Float = 16f, bold: Boolean = false): Tex
     setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
     if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
     textAlignment = TextView.TEXT_ALIGNMENT_VIEW_START
+}
+
+/** A borderless icon button tinted with the accent color. */
+fun Context.iconButton(icon: Int, label: String, onClick: () -> Unit): ImageButton = ImageButton(this).apply {
+    setImageResource(icon)
+    setColorFilter(accent())
+    background = null
+    contentDescription = label
+    setOnClickListener { onClick() }
 }
 
 /** A rounded, filled button in the phone's Material You accent color. */

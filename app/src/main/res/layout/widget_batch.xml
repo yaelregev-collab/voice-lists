@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icon only, sized like an app icon so it takes one home screen spot. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_batch_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:contentDescription="@string/widget_batch_label">
+
+    <ImageView
+        android:id="@+id/widget_batch_icon"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_gravity="center"
+        android:background="@drawable/widget_batch_bg"
+        android:contentDescription="@string/widget_batch_label"
+        android:padding="14dp"
+        android:src="@drawable/ic_batch"
+        android:tint="@android:color/white" />
+</FrameLayout>

@@ -105,7 +105,7 @@ object Store {
         val json = toJson(data)
         ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, json).apply()
         Backup.write(ctx, json)
-        AddItemWidget.refreshAll(ctx)
+        refreshWidgets(ctx)
     }
 
     fun toJson(data: Data): String {

@@ -30,7 +30,7 @@ class ListActivity : Activity() {
     }
 
     private sealed class Row {
-        class Header(val name: String, val count: Int) : Row()
+        class Header(val category: Category?, val name: String, val count: Int) : Row()
         class Entry(val item: Item) : Row()
     }
 
@@ -86,6 +86,8 @@ class ListActivity : Activity() {
             addView(input, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(pill(s.add) { submit() })
             addView(voice, LinearLayout.LayoutParams(dp(48), dp(48)))
+            addView(iconButton(R.drawable.ic_batch, s.batchTitle) { list?.let { startAddMany(it) } },
+                LinearLayout.LayoutParams(dp(48), dp(48)))
         }
         closedNote = text(s.listClosedNote, 15f).apply {
             setPadding(dp(20), dp(14), dp(20), dp(14))
@@ -126,7 +128,7 @@ class ListActivity : Activity() {
         top.visibility = if (l.closed) View.GONE else View.VISIBLE
         closedNote.visibility = if (l.closed) View.VISIBLE else View.GONE
         rows = data.grouped(l).flatMap { (cat, items) ->
-            listOf(Row.Header(cat?.name ?: s.otherCategory, items.count { !it.done })) + items.map { Row.Entry(it) }
+            listOf(Row.Header(cat, cat?.name ?: s.otherCategory, items.count { !it.done })) + items.map { Row.Entry(it) }
         }
         adapter.notifyDataSetChanged()
         emptyView.visibility = if (rows.isEmpty()) View.VISIBLE else View.GONE
@@ -146,10 +148,17 @@ class ListActivity : Activity() {
             when (val r = rows[position]) {
                 is Row.Header -> LinearLayout(this@ListActivity).apply {
                     orientation = LinearLayout.HORIZONTAL
-                    setPadding(dp(12), dp(20), dp(12), dp(6))
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(12), dp(16), dp(4), dp(2))
                     addView(text(r.name, 19f, bold = true).apply { setTextColor(accent()) },
                         LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
                     addView(text(r.count.toString(), 15f).apply { alpha = 0.6f })
+                    // Say several items straight into this category of this list.
+                    val l = list
+                    if (r.category != null && l != null && !l.closed) {
+                        addView(iconButton(R.drawable.ic_batch, s.batchHere) { startAddMany(l, r.category) },
+                            LinearLayout.LayoutParams(dp(44), dp(44)).apply { marginStart = dp(8) })
+                    }
                 }
                 is Row.Entry -> entry(r.item)
             }

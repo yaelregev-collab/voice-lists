@@ -21,18 +21,25 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * The small floating window the widget opens. It listens for an item, moves on as soon as it hears "add",
+ * The small floating window the widgets open. It listens for an item, moves on as soon as it hears "add",
  * asks for the category, then the list when more than one is open, and saves. Questions are read aloud with text-to-speech.
+ *
+ * With [EXTRA_BATCH] it adds several items in a row instead: it asks for the list and the category
+ * (each confirmed with "select" / "בחר"; a new category is created), then adds every "<item> add" to them until "done".
  */
 class VoiceActivity : Activity() {
 
     companion object {
         /** Optional: add into this list without asking which one. */
         const val EXTRA_LIST = "list_id"
+        /** Add several items in a row to one category of one list. */
+        const val EXTRA_BATCH = "batch"
+        /** With [EXTRA_BATCH] and [EXTRA_LIST]: go straight to adding items to this category. */
+        const val EXTRA_CATEGORY = "category_id"
         private const val REQ_MIC = 1
     }
 
-    private enum class Step { ITEM, CATEGORY, CONFIRM, NEW_CATEGORY, LIST, DONE }
+    private enum class Step { ITEM, CATEGORY, CONFIRM, NEW_CATEGORY, LIST, B_LIST, B_NEW_LIST, B_CATEGORY, B_ITEMS, DONE }
 
     private lateinit var s: Str
     private lateinit var data: Data
@@ -41,6 +48,13 @@ class VoiceActivity : Activity() {
     private var category: Category? = null
     private var pendingCategory: String? = null
     private var presetList: ItemList? = null
+
+    private var batch = false
+    private var presetCategory: Category? = null
+    private var batchList: ItemList? = null
+    /** A list or category name heard without "select", waiting for it. */
+    private var pendingName: String? = null
+    private val added = mutableListOf<String>()
 
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
@@ -58,6 +72,7 @@ class VoiceActivity : Activity() {
     private lateinit var titleView: TextView
     private lateinit var heardView: TextView
     private lateinit var statusView: TextView
+    private lateinit var logView: TextView
     private lateinit var micView: ImageView
     private lateinit var chips: LinearLayout
     private lateinit var chipsScroll: HorizontalScrollView
@@ -68,6 +83,8 @@ class VoiceActivity : Activity() {
         s = Lang.strings(this)
         data = Store.load(this)
         presetList = data.list(intent.getLongExtra(EXTRA_LIST, -1L))?.takeIf { !it.closed }
+        batch = intent.getBooleanExtra(EXTRA_BATCH, false)
+        presetCategory = data.category(intent.getLongExtra(EXTRA_CATEGORY, -1L))
         buildUi()
 
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
@@ -107,7 +124,7 @@ class VoiceActivity : Activity() {
     private fun maybeStart() {
         if (started || !ttsInitDone || !hasMic()) return
         started = true
-        beginItem()
+        if (batch) beginBatch() else beginItem()
     }
 
     // ---- The conversation ----
@@ -124,8 +141,8 @@ class VoiceActivity : Activity() {
     private fun onHeard(results: List<String>) {
         misses = 0
         val first = results.first().trim()
-        if (results.any { Matcher.isCancel(it) }) {
-            finish()
+        if (results.any { Matcher.isCancel(it) || (batch && Matcher.isDone(it)) }) {
+            if (step == Step.B_ITEMS) finishBatch() else finish()
             return
         }
         when (step) {
@@ -188,6 +205,43 @@ class VoiceActivity : Activity() {
                 }
                 val match = results.firstNotNullOfOrNull { Matcher.findList(data.openLists, Matcher.stripAdd(it) ?: it) }
                 if (match != null) addTo(match) else askList()
+            }
+            Step.B_LIST, Step.B_CATEGORY -> {
+                // The name, then "select" / "בחר".
+                val names = results.mapNotNull { Matcher.stripChoice(it) }
+                when {
+                    names.isNotEmpty() -> choose(names)
+                    results.any { Matcher.isChoice(it) } -> pendingName?.let { choose(listOf(it)) } ?: listen()
+                    else -> {
+                        pendingName = first
+                        heardView.text = first
+                        status(s.heardChoice(first))
+                        showActions()
+                        listen()
+                    }
+                }
+            }
+            Step.B_NEW_LIST -> when {
+                results.any { Matcher.isYes(it) || Matcher.isChoice(it) } -> createBatchList()
+                results.any { Matcher.isAgain(it) } -> askBatchList()
+                // Maybe the name of another list.
+                else -> chooseList(results.map { Matcher.stripChoice(it) ?: it })
+            }
+            Step.B_ITEMS -> {
+                if (results.any { Matcher.isAdd(it) }) {
+                    item?.let { batchAdd(it) } ?: listen()
+                    return
+                }
+                val withAdd = results.firstNotNullOfOrNull { Matcher.stripAdd(it) }
+                if (withAdd != null) {
+                    batchAdd(withAdd)
+                    return
+                }
+                item = first
+                heardView.text = first
+                status(s.heardItem(first))
+                showActions()
+                listen()
             }
             Step.DONE -> {}
         }
@@ -267,6 +321,130 @@ class VoiceActivity : Activity() {
         say(s.added(text, cat.name, list.name)) { finish() }
     }
 
+    // ---- Adding several items in a row ----
+
+    private fun beginBatch() {
+        val list = presetList ?: return askBatchList()
+        batchList = list
+        val c = presetCategory ?: return askBatchCategory()
+        startBatchItems(c, created = false)
+    }
+
+    private fun askBatchList() {
+        step = Step.B_LIST
+        pendingName = null
+        titleView.text = s.askList
+        heardView.text = ""
+        showActions()
+        say(s.askList) {
+            status(s.batchListHint)
+            listen()
+        }
+    }
+
+    private fun choose(names: List<String>) {
+        if (step == Step.B_CATEGORY) chooseBatchCategory(names) else chooseList(names)
+    }
+
+    /** An open list by that name, or an offer to create it. */
+    private fun chooseList(names: List<String>) {
+        val match = names.firstNotNullOfOrNull { Matcher.findList(data.openLists, it) }
+        if (match != null) {
+            batchList = match
+            askBatchCategory()
+            return
+        }
+        val name = names.first().trim().replaceFirstChar { it.uppercase(s.locale) }
+        step = Step.B_NEW_LIST
+        pendingName = name
+        titleView.text = "${s.newList}: $name"
+        showActions()
+        say(s.listNotFound(name)) { listen() }
+    }
+
+    private fun createBatchList(name: String? = pendingName) {
+        val n = name?.trim()?.ifEmpty { null } ?: return askBatchList()
+        val list = ItemList(Store.newId(), n)
+        data.lists.add(list)
+        Store.save(this, data)
+        batchList = list
+        askBatchCategory()
+    }
+
+    private fun askBatchCategory() {
+        step = Step.B_CATEGORY
+        pendingName = null
+        titleView.text = "${batchList?.name ?: ""}: ${s.askCategory}"
+        heardView.text = ""
+        showActions()
+        say(s.askCategory) {
+            status(s.batchCategoryHint)
+            listen()
+        }
+    }
+
+    /** The category by that name, created when there isn't one. */
+    private fun chooseBatchCategory(names: List<String>) {
+        val match = names.firstNotNullOfOrNull { Matcher.findCategory(data.categories, it) }
+        if (match != null) return startBatchItems(match, created = false)
+        val name = names.first().trim().replaceFirstChar { it.uppercase(s.locale) }
+        if (name.isEmpty()) return askBatchCategory()
+        val c = data.categoryNamed(name)
+        Store.save(this, data)
+        startBatchItems(c, created = true)
+    }
+
+    private fun startBatchItems(c: Category, created: Boolean) {
+        val list = batchList ?: return askBatchList()
+        category = c
+        item = null
+        step = Step.B_ITEMS
+        titleView.text = "${c.name} · ${list.name}"
+        heardView.text = ""
+        showActions()
+        say(if (created) s.categoryCreated(c.name) + " " + s.batchStart else s.batchStart) {
+            status(s.batchHint)
+            listen()
+        }
+    }
+
+    private fun batchAdd(raw: String) {
+        val list = batchList ?: return
+        val c = category ?: return
+        val text = raw.trim().replaceFirstChar { it.uppercase(s.locale) }
+        item = null
+        heardView.text = text
+        showActions()
+        if (Store.findOpenItem(list, text) != null) {
+            say(s.alreadyInList(text)) {
+                status(s.batchHint)
+                listen()
+            }
+            return
+        }
+        Store.addItem(list, c, text)
+        Store.save(this, data)
+        added.add(text)
+        logView.text = added.takeLast(6).joinToString("\n") { "✓ $it" }
+        logView.visibility = View.VISIBLE
+        say(s.addedShort) {
+            status(s.batchHint)
+            listen()
+        }
+    }
+
+    private fun finishBatch() {
+        step = Step.DONE
+        showActions()
+        say(s.batchDone(added.size, category?.name ?: "", batchList?.name ?: "")) { finish() }
+    }
+
+    /** Lets a name be typed instead of said. */
+    private fun typeName(title: String, then: (String) -> Unit) {
+        stopListening()
+        prompt(title, "") { then(it) }
+    }
+
     // ---- Speech in and out ----
 
     private fun say(text: String, then: () -> Unit) {
@@ -338,6 +516,20 @@ class VoiceActivity : Activity() {
                 }
                 return
             }
+            if (step == Step.B_LIST || step == Step.B_CATEGORY) {
+                if (Matcher.stripTrailingChoice(p) != null) {
+                    stopListening()
+                    onHeard(listOf(p))
+                }
+                return
+            }
+            if (step == Step.B_ITEMS) {
+                if (Matcher.stripTrailingAdd(p) != null) {
+                    stopListening()
+                    onHeard(listOf(p))
+                }
+                return
+            }
             if (step != Step.ITEM) return
             val withAdd = Matcher.stripTrailingAdd(p)
             when {
@@ -361,7 +553,8 @@ class VoiceActivity : Activity() {
             when (error) {
                 SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> {
                     misses++
-                    if (misses <= 2) listen() else status(s.notHeard)
+                    // While adding items in a row, keep listening through longer pauses.
+                    if (misses <= (if (step == Step.B_ITEMS) 8 else 2)) listen() else status(s.notHeard)
                 }
                 SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> status(s.micPermission)
                 SpeechRecognizer.ERROR_RECOGNIZER_BUSY, SpeechRecognizer.ERROR_CLIENT -> {
@@ -388,9 +581,14 @@ class VoiceActivity : Activity() {
         }
         Lang.applyDirection(root, s.he)
 
-        titleView = text(s.sayItem, 20f, bold = true)
+        titleView = text(if (batch) s.batchTitle else s.sayItem, 20f, bold = true)
         heardView = text("", 26f).apply { setPadding(0, dp(12), 0, dp(4)); minHeight = dp(40) }
-        statusView = text(s.sayItemHint, 15f).apply { alpha = 0.75f }
+        statusView = text(if (batch) "" else s.sayItemHint, 15f).apply { alpha = 0.75f }
+        logView = text("", 15f).apply {
+            alpha = 0.8f
+            setPadding(0, dp(8), 0, 0)
+            visibility = View.GONE
+        }
 
         micView = ImageView(this).apply {
             setImageResource(R.drawable.ic_mic)
@@ -431,6 +629,7 @@ class VoiceActivity : Activity() {
         root.addView(titleView)
         root.addView(heardView)
         root.addView(statusView)
+        root.addView(logView)
         root.addView(micRow)
         root.addView(chipsScroll)
         root.addView(actions)
@@ -462,7 +661,24 @@ class VoiceActivity : Activity() {
                 chips.addView(pill(l.name, filled = false) { addTo(l) }, gap)
             }
         }
-        if (step != Step.DONE) actions.addView(pill(s.cancel, filled = false) { finish() }, gap)
+        if (step == Step.B_LIST) {
+            chipsScroll.visibility = View.VISIBLE
+            chips.addView(pill("+ " + s.newList) { typeName(s.newList) { createBatchList(it) } }, gap)
+            for (l in data.openLists) {
+                chips.addView(pill(l.name, filled = false) {
+                    batchList = l
+                    askBatchCategory()
+                }, gap)
+            }
+        }
+        if (step == Step.B_CATEGORY) {
+            chipsScroll.visibility = View.VISIBLE
+            chips.addView(pill(s.newCategoryButton) { typeName(s.newCategory) { chooseBatchCategory(listOf(it)) } }, gap)
+            for (c in data.categories) {
+                chips.addView(pill(c.name, filled = false) { startBatchItems(c, created = false) }, gap)
+            }
+        }
+        if (step != Step.DONE && step != Step.B_ITEMS) actions.addView(pill(s.cancel, filled = false) { finish() }, gap)
         when (step) {
             Step.ITEM -> if (item != null) actions.addView(pill(s.add) { itemConfirmed() }, gap)
             Step.CONFIRM -> {
@@ -473,6 +689,17 @@ class VoiceActivity : Activity() {
                 stopListening()
                 prompt(s.newCategory, "") { createAndAdd(it) }
             }, gap)
+            Step.B_LIST, Step.B_CATEGORY -> pendingName?.let { name ->
+                actions.addView(pill(s.select) { choose(listOf(name)) }, gap)
+            }
+            Step.B_NEW_LIST -> {
+                actions.addView(pill(s.again, filled = false) { askBatchList() }, gap)
+                actions.addView(pill(s.yes) { createBatchList() }, gap)
+            }
+            Step.B_ITEMS -> {
+                actions.addView(pill(s.doneButton, filled = false) { finishBatch() }, gap)
+                item?.let { pending -> actions.addView(pill(s.add) { batchAdd(pending) }, gap) }
+            }
             else -> {}
         }
     }

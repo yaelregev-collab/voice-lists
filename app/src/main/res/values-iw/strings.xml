@@ -3,4 +3,7 @@
     <string name="widget_name">הוספת פריט בקול</string>
     <string name="widget_description">הקישו, אמרו את הפריט ואז \"הוסף\".</string>
     <string name="widget_label">הוסף פריט</string>
+    <string name="widget_batch_name">הוספת כמה פריטים בקול</string>
+    <string name="widget_batch_description">הקישו, בחרו רשימה וקטגוריה, ואמרו פריטים ברצף.</string>
+    <string name="widget_batch_label">הוספה ברצף</string>
 </resources>

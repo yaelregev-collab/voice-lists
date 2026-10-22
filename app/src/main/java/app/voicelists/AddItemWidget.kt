@@ -35,3 +35,9 @@ class AddItemWidget : AppWidgetProvider() {
         }
     }
 }
+
+/** Redraws both home screen widgets (their labels follow the app's language). */
+fun refreshWidgets(context: Context) {
+    AddItemWidget.refreshAll(context)
+    BatchWidget.refreshAll(context)
+}
