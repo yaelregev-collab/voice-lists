@@ -8,7 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.RemoteViews
 
-/** Home screen button: one tap opens the voice window and starts listening. */
+/** Home screen mic button, one icon in size: one tap opens the voice window and starts listening. */
 class AddItemWidget : AppWidgetProvider() {
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
@@ -28,7 +28,7 @@ class AddItemWidget : AppWidgetProvider() {
             val pending = PendingIntent.getActivity(context, 0, intent,
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             val views = RemoteViews(context.packageName, R.layout.widget_add_item).apply {
-                setTextViewText(R.id.widget_label, Lang.strings(context).widgetLabel)
+                setContentDescription(R.id.widget_icon, Lang.strings(context).widgetLabel)
                 setOnClickPendingIntent(R.id.widget_root, pending)
             }
             manager.updateAppWidget(ids, views)
