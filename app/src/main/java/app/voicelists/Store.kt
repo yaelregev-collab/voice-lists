@@ -130,21 +130,24 @@ object Store {
         return lastId
     }
 
-    /** An item in this list that is still open (not checked off) with the same name. */
-    fun findOpenItem(list: ItemList, text: String): Item? =
-        list.items.firstOrNull { !it.done && Matcher.sameText(it.text, text) }
+    /**
+     * The same item, still open (not checked off), in this category of this list. An item only has to be unique
+     * within its list and category: "Shirts" can be under several categories of one list (one per person).
+     */
+    fun findOpenItem(list: ItemList, categoryId: Long, text: String): Item? =
+        list.items.firstOrNull { !it.done && it.categoryId == categoryId && Matcher.sameText(it.text, text) }
 
-    /** Adds the item, dropping an old checked-off copy of it from the same list. */
+    /** Adds the item, dropping an old checked-off copy of it from the same category of the list. */
     fun addItem(list: ItemList, category: Category, text: String) {
-        list.items.removeAll { it.done && Matcher.sameText(it.text, text) }
+        list.items.removeAll { it.done && it.categoryId == category.id && Matcher.sameText(it.text, text) }
         list.items.add(Item(newId(), text.trim(), category.id))
     }
 
-    /** Moves an item to another list (dropping a checked-off copy already there). */
+    /** Moves an item to another list, same category (dropping a checked-off copy already there). */
     fun moveItem(item: Item, from: ItemList, to: ItemList) {
         if (from === to) return
         from.items.remove(item)
-        to.items.removeAll { it.done && Matcher.sameText(it.text, item.text) }
+        to.items.removeAll { it.done && it.categoryId == item.categoryId && Matcher.sameText(it.text, item.text) }
         to.items.add(item)
     }
 }

@@ -195,7 +195,12 @@ class ListActivity : Activity() {
     }
 
     private fun changeCategory(item: Item) {
+        val l = list ?: return
         pickCategory("${s.moveToCategory} (${item.text})", data, exclude = data.category(item.categoryId)) { c ->
+            if (!item.done && Store.findOpenItem(l, c.id, item.text) != null) {
+                toast(s.alreadyExists(item.text, c.name, l.name))
+                return@pickCategory
+            }
             item.categoryId = c.id
             save()
             toast(s.movedTo(item.text, c.name))
@@ -205,6 +210,10 @@ class ListActivity : Activity() {
     private fun moveToList(item: Item) {
         val from = list ?: return
         pickList(data, exclude = from) { to ->
+            if (!item.done && Store.findOpenItem(to, item.categoryId, item.text) != null) {
+                toast(s.alreadyExists(item.text, data.category(item.categoryId)?.name ?: s.otherCategory, to.name))
+                return@pickList
+            }
             Store.moveItem(item, from, to)
             save()
             toast(s.movedTo(item.text, to.name))
@@ -235,6 +244,7 @@ class ListActivity : Activity() {
         menu.add(0, 2, 1, if (l.closed) s.reopenList else s.closeList)
         menu.add(0, 3, 2, s.rename)
         menu.add(0, 4, 3, s.deleteList)
+        menu.add(0, 5, 4, s.print)
         return true
     }
 
@@ -244,6 +254,7 @@ class ListActivity : Activity() {
             1 -> { l.items.removeAll { it.done }; save() }
             2 -> { l.closed = !l.closed; save() }
             3 -> prompt(s.rename, l.name) { l.name = it; save() }
+            5 -> ListPrinter.print(this, data, l)
             4 -> AlertDialog.Builder(this)
                 .setMessage(s.confirmDelete(l.name))
                 .setPositiveButton(s.delete) { _, _ ->

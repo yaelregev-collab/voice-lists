@@ -311,8 +311,8 @@ class VoiceActivity : Activity() {
         val cat = category ?: return askCategory()
         step = Step.DONE
         showActions()
-        if (Store.findOpenItem(list, text) != null) {
-            say(s.alreadyExists(text, list.name)) { finish() }
+        if (Store.findOpenItem(list, cat.id, text) != null) {
+            say(s.alreadyExists(text, cat.name, list.name)) { finish() }
             return
         }
         Store.addItem(list, cat, text)
@@ -415,8 +415,8 @@ class VoiceActivity : Activity() {
         item = null
         heardView.text = text
         showActions()
-        if (Store.findOpenItem(list, text) != null) {
-            say(s.alreadyInList(text)) {
+        if (Store.findOpenItem(list, c.id, text) != null) {
+            say(s.alreadyInCategory(text)) {
                 status(s.batchHint)
                 listen()
             }

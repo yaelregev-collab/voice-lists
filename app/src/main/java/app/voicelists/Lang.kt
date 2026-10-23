@@ -62,6 +62,7 @@ class Str(val he: Boolean) {
     val clearChecked = t("Remove checked items", "מחק פריטים מסומנים")
     val deleteList = t("Delete list", "מחק רשימה")
     val closeList = t("Close list", "סגור רשימה")
+    val print = t("Print", "הדפסה")
     val reopenList = t("Reopen list", "פתח רשימה מחדש")
     val closed = t("Closed", "סגורה")
     val closedLists = t("Closed lists", "רשימות סגורות")
@@ -119,7 +120,7 @@ class Str(val he: Boolean) {
     val sayItem = t("What would you like to add?", "מה להוסיף?")
     val sayItemHint = t("Say the item, then say \"add\".", "אמרו את הפריט, ואז \"הוסף\".")
     fun heardItem(item: String) = t("\"$item\". Say \"add\" to continue.", "\"$item\". אמרו \"הוסף\" כדי להמשיך.")
-    fun alreadyExists(item: String, list: String) = t("$item is already in $list.", "$item כבר נמצא ב$list.")
+    fun alreadyExists(item: String, cat: String, list: String) = t("$item is already in $cat in $list.", "$item כבר נמצא ב$cat ב$list.")
     val askCategory = t("Which category?", "לאיזו קטגוריה?")
     val askList = t("Which list?", "לאיזו רשימה?")
     val listHint = t("Say the name of the list.", "אמרו את שם הרשימה.")
@@ -156,7 +157,7 @@ class Str(val he: Boolean) {
     val batchHint = t("Say an item, then \"add\". Say \"done\" when you're finished.",
         "אמרו פריט ואז \"הוסף\". בסוף אמרו \"סיום\".")
     val addedShort = t("Added", "נוסף")
-    fun alreadyInList(item: String) = t("$item is already on the list.", "$item כבר ברשימה.")
+    fun alreadyInCategory(item: String) = t("$item is already in this category.", "$item כבר בקטגוריה הזו.")
     fun batchDone(n: Int, cat: String, list: String) = when (n) {
         0 -> t("Nothing was added.", "לא נוספו פריטים.")
         1 -> t("Added 1 item to $cat in $list.", "נוסף פריט אחד ל$cat ב$list.")

@@ -219,10 +219,11 @@ class MainActivity : Activity() {
     private fun listMenu(l: ItemList) {
         AlertDialog.Builder(this)
             .setTitle(l.name)
-            .setItems(arrayOf(if (l.closed) s.reopenList else s.closeList, s.rename, s.deleteList)) { _, which ->
+            .setItems(arrayOf(s.print, if (l.closed) s.reopenList else s.closeList, s.rename, s.deleteList)) { _, which ->
                 when (which) {
-                    0 -> { l.closed = !l.closed; save() }
-                    1 -> prompt(s.rename, l.name) { l.name = it; save() }
+                    0 -> ListPrinter.print(this, data, l)
+                    1 -> { l.closed = !l.closed; save() }
+                    2 -> prompt(s.rename, l.name) { l.name = it; save() }
                     else -> confirmDeleteList(l)
                 }
             }

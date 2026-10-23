@@ -40,6 +40,11 @@ and from the button on each category heading inside a list (that one goes straig
 - **Categories** screen: every category with its item count. Renaming changes it for every item in every list;
   deleting asks where to move its items (or deletes them too, if chosen). Renaming to an existing name merges the two.
 
+- An item only has to be unique within its list and category: the same item ("3 shirts") can be under several
+  categories of one list, for example one category per person.
+- **Print** (list menu, or long-press a list): A4 pages with three columns. Categories come in order, each with its
+  items underneath, flowing from one column to the next and on to as many pages as needed.
+
 ## Keeping your lists
 - Installing a new version over the installed one keeps everything. Don't uninstall first: uninstalling erases the app's data.
   Android refuses to install an older version over a newer one, so always open the file with the highest version number.

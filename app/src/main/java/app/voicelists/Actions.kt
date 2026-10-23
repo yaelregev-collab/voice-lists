@@ -49,14 +49,10 @@ fun Activity.addItemFlow(data: Data, raw: String, list: ItemList?, done: () -> U
     val s = Lang.strings(this)
     val text = raw.trim().replaceFirstChar { it.uppercase(s.locale) }
     if (text.isEmpty()) return
-    if (list != null) Store.findOpenItem(list, text)?.let {
-        Toast.makeText(this, s.alreadyExists(text, list.name), Toast.LENGTH_SHORT).show()
-        return
-    }
     pickCategory("${s.askCategory} ($text)", data) { cat ->
         fun addTo(l: ItemList) {
-            if (Store.findOpenItem(l, text) != null) {
-                Toast.makeText(this, s.alreadyExists(text, l.name), Toast.LENGTH_SHORT).show()
+            if (Store.findOpenItem(l, cat.id, text) != null) {
+                Toast.makeText(this, s.alreadyExists(text, cat.name, l.name), Toast.LENGTH_SHORT).show()
             } else {
                 Store.addItem(l, cat, text)
                 Toast.makeText(this, s.added(text, cat.name, l.name), Toast.LENGTH_SHORT).show()
