@@ -63,6 +63,28 @@ class Str(val he: Boolean) {
     val deleteList = t("Delete list", "מחק רשימה")
     val closeList = t("Close list", "סגור רשימה")
     val print = t("Print", "הדפסה")
+
+    // Merging lists
+    val mergeLists = t("Merge lists…", "איחוד רשימות…")
+    val mergeWith = t("Merge with other lists…", "איחוד עם רשימות אחרות…")
+    val mergeChoose = t("Which lists to merge?", "אילו רשימות לאחד?")
+    val next = t("Next", "המשך")
+    val mergeWhere = t("Merge into…", "לאן לאחד?")
+    val mergeIntoExisting = t("One of these lists", "לתוך אחת הרשימות")
+    val mergeIntoNew = t("A new list", "לרשימה חדשה")
+    val mergeTarget = t("Into which list?", "לתוך איזו רשימה?")
+    val mergedListName = t("Name of the merged list", "שם הרשימה המאוחדת")
+    val mergeNeedsTwo = t("Merging needs at least two lists.", "כדי לאחד צריך לפחות שתי רשימות.")
+    fun mergeConfirm(sources: List<String>, target: String): String {
+        val names = sources.joinToString(", ") { "\"$it\"" }
+        val move = if (sources.size == 1) t("All items from $names will move to \"$target\", and $names will be removed.",
+            "כל הפריטים מהרשימה $names יעברו ל\"$target\", והרשימה $names תימחק.")
+        else t("All items from $names will move to \"$target\", and those lists will be removed.",
+            "כל הפריטים מהרשימות $names יעברו ל\"$target\", והרשימות האלה יימחקו.")
+        return move + t(" An item that is in the same category in more than one of them appears once.",
+            " פריט שנמצא באותה קטגוריה ביותר מרשימה אחת יופיע פעם אחת.")
+    }
+    fun mergedInto(target: String) = t("Merged into \"$target\"", "אוחד לתוך \"$target\"")
     val reopenList = t("Reopen list", "פתח רשימה מחדש")
     val closed = t("Closed", "סגורה")
     val closedLists = t("Closed lists", "רשימות סגורות")

@@ -45,6 +45,10 @@ and from the button on each category heading inside a list (that one goes straig
 - **Print** (list menu, or long-press a list): A4 pages with three columns. Categories come in order, each with its
   items underneath, flowing from one column to the next and on to as many pages as needed.
 
+- **Merge lists** (main screen menu, or long-press a list → Merge with other lists): pick the lists, then merge them
+  into one of them or into a new list with a name you type. The merged-from lists are removed; an item that sits in the
+  same category in more than one of them appears once.
+
 ## Keeping your lists
 - Installing a new version over the installed one keeps everything. Don't uninstall first: uninstalling erases the app's data.
   Android refuses to install an older version over a newer one, so always open the file with the highest version number.

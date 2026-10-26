@@ -2,6 +2,7 @@ package app.voicelists
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.DialogInterface
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -33,6 +34,7 @@ class MainActivity : Activity() {
         private const val MENU_RESTORE = 2
         private const val MENU_LANGUAGE = 3
         private const val MENU_VERSION = 4
+        private const val MENU_MERGE = 5
     }
 
     private sealed class Row {
@@ -219,14 +221,80 @@ class MainActivity : Activity() {
     private fun listMenu(l: ItemList) {
         AlertDialog.Builder(this)
             .setTitle(l.name)
-            .setItems(arrayOf(s.print, if (l.closed) s.reopenList else s.closeList, s.rename, s.deleteList)) { _, which ->
+            .setItems(arrayOf(s.print, if (l.closed) s.reopenList else s.closeList, s.mergeWith, s.rename, s.deleteList)) { _, which ->
                 when (which) {
                     0 -> ListPrinter.print(this, data, l)
                     1 -> { l.closed = !l.closed; save() }
-                    2 -> prompt(s.rename, l.name) { l.name = it; save() }
+                    2 -> mergeLists(l)
+                    3 -> prompt(s.rename, l.name) { l.name = it; save() }
                     else -> confirmDeleteList(l)
                 }
             }
+            .show()
+    }
+
+    // ---- Merging lists: pick them, then merge into one of them or into a new list ----
+
+    private fun mergeLists(preselect: ItemList? = null) {
+        val all = data.lists.toList()
+        if (all.size < 2) return toast(s.mergeNeedsTwo)
+        val labels = all.map { if (it.closed) "${it.name} (${s.closed})" else it.name }.toTypedArray()
+        val checked = BooleanArray(all.size) { all[it] === preselect }
+        var dialog: AlertDialog? = null
+        // "Next" needs at least two lists.
+        fun update() {
+            dialog?.getButton(DialogInterface.BUTTON_POSITIVE)?.isEnabled = checked.count { it } >= 2
+        }
+        dialog = AlertDialog.Builder(this)
+            .setTitle(s.mergeChoose)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+                update()
+            }
+            .setPositiveButton(s.next) { _, _ -> mergeWhere(all.filterIndexed { i, _ -> checked[i] }) }
+            .setNegativeButton(s.cancel, null)
+            .show()
+        update()
+    }
+
+    private fun mergeWhere(chosen: List<ItemList>) {
+        AlertDialog.Builder(this)
+            .setTitle(s.mergeWhere)
+            .setItems(arrayOf(s.mergeIntoExisting, s.mergeIntoNew)) { _, which ->
+                if (which == 0) {
+                    AlertDialog.Builder(this)
+                        .setTitle(s.mergeTarget)
+                        .setItems(chosen.map { it.name }.toTypedArray()) { _, i -> confirmMerge(chosen, chosen[i], chosen[i].name) }
+                        .setNegativeButton(s.cancel, null)
+                        .show()
+                } else {
+                    prompt(s.mergedListName, "") { name -> confirmMerge(chosen, null, name) }
+                }
+            }
+            .setNegativeButton(s.cancel, null)
+            .show()
+    }
+
+    /** Merges [chosen] into [target], or into a new list called [name] when [target] is null. */
+    private fun confirmMerge(chosen: List<ItemList>, target: ItemList?, name: String) {
+        val sources = chosen.filter { it !== target }
+        AlertDialog.Builder(this)
+            .setMessage(s.mergeConfirm(sources.map { it.name }, name))
+            .setPositiveButton(s.merge) { _, _ ->
+                // Look the lists up again: the data may have been reloaded while the dialogs were open.
+                val lists = chosen.mapNotNull { data.list(it.id) }
+                val existing = target?.let { data.list(it.id) }
+                val from = lists.filter { it !== existing }
+                if (from.isEmpty() || (target != null && existing == null)) return@setPositiveButton
+                // A new list takes the place of the first list merged into it.
+                val into = existing ?: ItemList(Store.newId(), name).also {
+                    data.lists.add(maxOf(0, data.lists.indexOf(from.first())), it)
+                }
+                Store.mergeLists(data, from, into)
+                save()
+                toast(s.mergedInto(into.name))
+            }
+            .setNegativeButton(s.cancel, null)
             .show()
     }
 
@@ -239,6 +307,7 @@ class MainActivity : Activity() {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        menu.add(0, MENU_MERGE, 0, s.mergeLists)
         menu.add(0, MENU_BACKUP, 0, s.backupMenu)
         menu.add(0, MENU_RESTORE, 1, s.restoreMenu)
         menu.add(0, MENU_LANGUAGE, 2, s.language)
@@ -248,6 +317,7 @@ class MainActivity : Activity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
+            MENU_MERGE -> mergeLists()
             MENU_BACKUP -> backupSettings()
             MENU_RESTORE -> chooseRestoreFile()
             MENU_LANGUAGE -> chooseLanguage()

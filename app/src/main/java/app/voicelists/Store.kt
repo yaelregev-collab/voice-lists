@@ -143,6 +143,28 @@ object Store {
         list.items.add(Item(newId(), text.trim(), category.id))
     }
 
+    /**
+     * Moves every item of [sources] into [target] and removes those lists. An item that is already in the same
+     * category of [target] isn't doubled; an open copy wins over a checked-off one.
+     */
+    fun mergeLists(data: Data, sources: List<ItemList>, target: ItemList) {
+        for (source in sources) {
+            if (source === target) continue
+            for (item in source.items) {
+                val same = target.items.firstOrNull { it.categoryId == item.categoryId && Matcher.sameText(it.text, item.text) }
+                when {
+                    same == null -> target.items.add(item)
+                    same.done && !item.done -> {
+                        target.items.remove(same)
+                        target.items.add(item)
+                    }
+                    else -> {} // Already there.
+                }
+            }
+            data.lists.remove(source)
+        }
+    }
+
     /** Moves an item to another list, same category (dropping a checked-off copy already there). */
     fun moveItem(item: Item, from: ItemList, to: ItemList) {
         if (from === to) return
