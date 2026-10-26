@@ -75,13 +75,18 @@ class Str(val he: Boolean) {
     val mergeTarget = t("Into which list?", "לתוך איזו רשימה?")
     val mergedListName = t("Name of the merged list", "שם הרשימה המאוחדת")
     val mergeNeedsTwo = t("Merging needs at least two lists.", "כדי לאחד צריך לפחות שתי רשימות.")
-    fun mergeConfirm(sources: List<String>, target: String): String {
+    /** [intoNew]: the items are copied into a new list and the original lists stay. */
+    fun mergeConfirm(sources: List<String>, target: String, intoNew: Boolean): String {
         val names = sources.joinToString(", ") { "\"$it\"" }
-        val move = if (sources.size == 1) t("All items from $names will move to \"$target\", and $names will be removed.",
-            "כל הפריטים מהרשימה $names יעברו ל\"$target\", והרשימה $names תימחק.")
-        else t("All items from $names will move to \"$target\", and those lists will be removed.",
-            "כל הפריטים מהרשימות $names יעברו ל\"$target\", והרשימות האלה יימחקו.")
-        return move + t(" An item that is in the same category in more than one of them appears once.",
+        val what = when {
+            intoNew -> t("All items from $names will be copied to the new list \"$target\". The original lists stay as they are.",
+                "כל הפריטים מהרשימות $names יועתקו לרשימה החדשה \"$target\". הרשימות המקוריות יישארו כמו שהן.")
+            sources.size == 1 -> t("All items from $names will move to \"$target\", and $names will be removed.",
+                "כל הפריטים מהרשימה $names יעברו ל\"$target\", והרשימה $names תימחק.")
+            else -> t("All items from $names will move to \"$target\", and those lists will be removed.",
+                "כל הפריטים מהרשימות $names יעברו ל\"$target\", והרשימות האלה יימחקו.")
+        }
+        return what + t(" An item that is in the same category in more than one of them appears once.",
             " פריט שנמצא באותה קטגוריה ביותר מרשימה אחת יופיע פעם אחת.")
     }
     fun mergedInto(target: String) = t("Merged into \"$target\"", "אוחד לתוך \"$target\"")

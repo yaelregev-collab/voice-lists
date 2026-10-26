@@ -144,13 +144,15 @@ object Store {
     }
 
     /**
-     * Moves every item of [sources] into [target] and removes those lists. An item that is already in the same
-     * category of [target] isn't doubled; an open copy wins over a checked-off one.
+     * Puts every item of [sources] into [target]: moved, and those lists removed, or copied when [keepSources]
+     * (merging into a new list keeps the originals). An item that is already in the same category of [target]
+     * isn't doubled; an open copy wins over a checked-off one.
      */
-    fun mergeLists(data: Data, sources: List<ItemList>, target: ItemList) {
+    fun mergeLists(data: Data, sources: List<ItemList>, target: ItemList, keepSources: Boolean) {
         for (source in sources) {
             if (source === target) continue
-            for (item in source.items) {
+            for (original in source.items) {
+                val item = if (keepSources) Item(newId(), original.text, original.categoryId, original.done) else original
                 val same = target.items.firstOrNull { it.categoryId == item.categoryId && Matcher.sameText(it.text, item.text) }
                 when {
                     same == null -> target.items.add(item)
@@ -161,7 +163,7 @@ object Store {
                     else -> {} // Already there.
                 }
             }
-            data.lists.remove(source)
+            if (!keepSources) data.lists.remove(source)
         }
     }
 

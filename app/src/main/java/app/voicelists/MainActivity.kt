@@ -279,18 +279,18 @@ class MainActivity : Activity() {
     private fun confirmMerge(chosen: List<ItemList>, target: ItemList?, name: String) {
         val sources = chosen.filter { it !== target }
         AlertDialog.Builder(this)
-            .setMessage(s.mergeConfirm(sources.map { it.name }, name))
+            .setMessage(s.mergeConfirm(sources.map { it.name }, name, intoNew = target == null))
             .setPositiveButton(s.merge) { _, _ ->
                 // Look the lists up again: the data may have been reloaded while the dialogs were open.
                 val lists = chosen.mapNotNull { data.list(it.id) }
                 val existing = target?.let { data.list(it.id) }
                 val from = lists.filter { it !== existing }
                 if (from.isEmpty() || (target != null && existing == null)) return@setPositiveButton
-                // A new list takes the place of the first list merged into it.
+                // A new list goes just before the first of the lists it's made from, which stay.
                 val into = existing ?: ItemList(Store.newId(), name).also {
                     data.lists.add(maxOf(0, data.lists.indexOf(from.first())), it)
                 }
-                Store.mergeLists(data, from, into)
+                Store.mergeLists(data, from, into, keepSources = existing == null)
                 save()
                 toast(s.mergedInto(into.name))
             }
